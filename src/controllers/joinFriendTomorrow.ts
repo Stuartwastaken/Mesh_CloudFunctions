@@ -59,8 +59,20 @@ export const joinFriendTomorrow = functions.firestore
       });
 
       await batch.commit();
-      console.log(`Added each other to the party_today subcollections of 
+      console.log(`Added each other to the 
+      party_today subcollections of
              authUid and otherUid.`);
+
+      // Write to join_lobby_tempbin
+      const joinLobbyTempbinRef = admin.firestore()
+          .collection("join_lobby_tempbin").doc();
+      await joinLobbyTempbinRef.set({
+        today: false,
+        party: [authUidRef, otherUidRef],
+      });
+
+      console.log(`Added authUid and otherUid
+       to the join_lobby_tempbin.`);
 
       return null;
     });

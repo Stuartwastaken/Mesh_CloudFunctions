@@ -14,163 +14,66 @@ export const matchLobby = functions.pubsub
       const lobbyTonightRef = firestore.collection("lobby_tonight");
       const lobbyTonightSnapshot = await lobbyTonightRef.get();
 
-      const parties = lobbyTonightSnapshot.docs
-          .map((doc) => ({...doc.data(),
-            data: doc.data(), ref: doc.ref}));
+      if (lobbyTonightSnapshot.empty) {
+        console.log("No documents found in lobby_tonight.");
+        return null;
+      }
 
+      const userLocations: Map<string, Set<string>> = new Map();
 
-      console.log("Parties in lobby:",
-          JSON.stringify(parties)); // Added console log
+      lobbyTonightSnapshot.forEach((doc) => {
+        const data = doc.data();
+        const locations = data
+            ?.locations as FirebaseFirestore.DocumentReference[];
 
-      const partyCombinations: any[] = [];
-      const toBeDeleted: Set<FirebaseFirestore.DocumentReference> = new Set();
-      for (let i = 0; i < parties.length; i++) {
-        for (let j = i + 1; j < parties.length; j++) {
-          const commonLocations = parties[i].data.locations
-              .filter((location1: FirebaseFirestore.DocumentReference) =>
-                parties[j].data.locations
-                    .some((location2: FirebaseFirestore.DocumentReference) =>
-                      location2.id === location1.id));
+        const member0 = data.member0?.id;
+        const member1 = data.member1?.id;
+        if (!locations) {
+          console.warn(`Locations is null for document 
+          ${doc.id}. Skipping this document.`);
+          return;
+        }
 
+        locations.forEach((location) => {
+          const locationId = location.id;
 
-          if (commonLocations.length) {
-            console.log("Common locations:",
-                commonLocations); // Added console log
-
-            const users1 = await getUsers(parties[i]);
-            const users2 = await getUsers(parties[j]);
-
-            const ages1 = users1.map((user) => getAge(user.birthday));
-            const ages2 = users2.map((user) => getAge(user.birthday));
-
-            if (areAgesWithinRange(ages1, ages2, 2)) {
-              console.log("Age range check passed"); // Added console log
-
-              partyCombinations.push({
-                party1: {...parties[i], ref: parties[i].ref},
-                party2: {...parties[j], ref: parties[j].ref},
-                commonLocations: commonLocations,
-              });
-            }
+          if (!userLocations.has(locationId)) {
+            userLocations.set(locationId, new Set());
           }
-        }
-      }
 
-      console.log("Party combinations:",
-          JSON.stringify(partyCombinations));
-
-      // Group users and create a new document in "grouped_tonight" collection
-      for (const combination of partyCombinations) {
-        if (combination.party1.memberCount +
-          combination.party2.memberCount === 4) {
-          const groupedTonightRef = firestore
-              .collection("grouped_tonight").doc();
-
-          const members = [
-            ...Object.values(combination.party1)
-                .filter((value) => value instanceof
-                FirebaseFirestore.DocumentReference),
-            ...Object.values(combination.party2)
-                .filter((value) => value instanceof
-                FirebaseFirestore.DocumentReference),
-          ];
-
-          await groupedTonightRef.set({
-            members: members,
-            location: combination.commonLocations[0],
-          });
-
-          // Add the DocumentReferences of the matched parties to be deleted
-          toBeDeleted.add(combination.party1.ref);
-          toBeDeleted.add(combination.party2.ref);
-        }
-      }
-
-      // Delete the documents from "lobby_tonight" collection
-      for (const docRef of toBeDeleted) {
-        // await docRef.delete();
-        console.log("To be deleted: ", JSON.stringify(docRef));
-      }
-    });
-
-interface User {
-  id: string;
-  displayName: string;
-  birthday: string;
-  friends: string[];
-}
-
-/**
- * Retrieves user objects for the given party.
- * @param {any} party - The party object.
- * @return {Promise<User[]>} - An array of user objects.
- */
-async function getUsers(party: any): Promise<User[]> {
-  const users: User[] = [];
-  for (const key of Object.keys(party)) {
-    if (key.startsWith("member")) {
-      const member = party[key];
-      const userSnapshot = await member.get();
-
-      // Retrieve friends DocumentReferences from the subcollection
-      const friendsSnapshot = await userSnapshot.ref
-          .collection("friends").get();
-      const friends = friendsSnapshot.docs
-          .map((doc: FirebaseFirestore.QueryDocumentSnapshot) =>
-            doc.data().uid);
-
-      users.push({
-        id: userSnapshot.id,
-        displayName: userSnapshot.get("display_name"),
-        birthday: userSnapshot.get("birthday"),
-        friends: friends,
+          userLocations.get(locationId)?.add(member0);
+          if (member1) {
+            userLocations.get(locationId)?.add(member1);
+          }
+        });
       });
-    }
-  }
-  return users;
-}
 
-/**
- * Calculates the age of a user based on their birthday string.
- * @param {string} birthdayStr - The user's birthday as a string.
- * @return {number} - The user's age in years.
- */
-function getAge(birthdayStr: string): number {
-  const birthday = new Date(birthdayStr);
-  const ageDifMs = Date.now() - birthday.getTime();
-  const ageDate = new Date(ageDifMs);
-  return Math.abs(ageDate.getUTCFullYear() - 1970);
-}
-/**
- * Determines if the age difference between
- * the two sets of ages is within the specified range.
- * @param {number[]} ages1 - Array of ages for the first group of users.
- * @param {number[]} ages2 - Array of ages for the second group of users.
- * @param {number} range - The maximum allowed age difference.
- * @return {boolean} - True if the age difference is
- *  within the specified range, false otherwise.
- */
-function areAgesWithinRange(ages1: number[],
-    ages2: number[], range: number): boolean {
-  // const allAges = ages1.concat(ages2);
-  // const minAge = Math.min(...allAges);
-  // const maxAge = Math.max(...allAges);
-  // return maxAge - minAge <= range;
-  return true;
-}
+      const commonLocations: string[] = [];
+      userLocations.forEach((users, locationId) => {
+        if (users.size >= 4) {
+          commonLocations.push(locationId);
+        }
+      });
 
-// /**
-//  * Determines if there are no friends in common between two sets of users.
-//  * @param {User[]} users1 - Array of user objects
-// for the first group of users.
-//  * @param {User[]} users2 - Array of user objects
-// for the second group of users.
-//  * @return {boolean} - True if there are no
-// friends in common, false otherwise.
-//  */
-// function noFriendsInCommon(users1: User[], users2: User[]): boolean {
-//   // const friends1 = users1.flatMap((user) => user.friends);
-//   // const ids2 = users2.map((user) => user.id);
-//   // return !friends1.some((friend) => ids2.includes(friend));
-//   return true;
-// }
+      if (commonLocations.length === 0) {
+        console.log("No common locations found for 4 users.");
+        return null;
+      }
+
+      // Select a random common location
+      const selectedLocation =
+      commonLocations[Math.floor(Math.random() * commonLocations.length)];
+
+      // Get the first 4 users for the selected location
+      const matchedUsers: string[] = Array
+          .from(userLocations
+              .get(selectedLocation)?.values() ?? []).slice(0, 4);
+
+      console.log(`Matched users: ${matchedUsers
+          .join(", ")} at location: ${selectedLocation}`);
+
+      // Perform further actions with matched users
+      // and location, e.g., notify users or create a new document
+
+      return null;
+    });
