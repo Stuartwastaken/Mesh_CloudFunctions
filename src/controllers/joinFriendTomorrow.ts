@@ -49,12 +49,12 @@ export const joinFriendTomorrow = functions.firestore
       // Update queuedToday and two_and_two_queued
       // fields for authUid and otherUid
       batch.update(authUidRef, {
-        queuedToday: true,
+        queuedTomorrow: true,
         two_and_two_queued: true,
       });
 
       batch.update(otherUidRef, {
-        queuedToday: true,
+        queuedTomorrow: true,
         two_and_two_queued: true,
       });
 

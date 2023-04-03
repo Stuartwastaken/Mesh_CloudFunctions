@@ -18,13 +18,13 @@ export const joinFriendTonight = functions.firestore
       const otherUidSnapshot = await otherUidRef.get();
 
       if (authUidSnapshot.exists && authUidSnapshot
-          .data()?.queued_today === true) {
+          .data()?.queuedToday === true) {
         console.log(`${authUidRef.id} is already in queue`);
         return null;
       }
 
       if (otherUidSnapshot.exists && otherUidSnapshot
-          .data()?.queued_today === true) {
+          .data()?.queuedToday === true) {
         console.log(`${otherUidRef.id} is already in queue`);
         return null;
       }

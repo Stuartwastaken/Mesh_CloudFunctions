@@ -7,7 +7,7 @@ export const quitLobby = functions.firestore
       const partyMembers: FirebaseFirestore.DocumentReference[] =
       snapshot.data()?.party;
       const today = snapshot.data()?.today;
-      let queuedWithPeople = false;
+      // let queuedWithPeople = false;
 
       if (!partyMembers || partyMembers.length === 0) {
         console
@@ -34,23 +34,32 @@ export const quitLobby = functions.firestore
           // the document reference to the partyMembers array
           const personDocRef = admin.firestore().doc(`user/${personUid.id}`);
           partyMembers.push(personDocRef);
-        } else {
-          const userRef = admin.firestore().doc(authUidRef.path);
-          const userDoc = await userRef.get();
-          const userData = userDoc.data();
-
-          batch.update(userRef, {
-            queuedToday: today ? false : userData?.queuedToday,
-            queuedTomorrow: today ? userData?.queuedTomorrow : false,
-          });
         }
       }
       const userRef = admin.firestore().doc(authUidRef.path);
-      if (partyMembers.length > 0) {
-        batch.update(userRef, {two_and_two_queued: false});
-        queuedWithPeople = true;
+      const userDoc = await userRef.get();
+      const userData = userDoc.data();
+      const queuedToday = userDoc.data()?.queuedToday;
+      const queuedTomorrow = userDoc.data()?.queuedTomorrow;
+
+      if (queuedToday && queuedTomorrow) {
+        batch.update(userRef, {
+          queuedToday: today ? false : userData?.queuedToday,
+          queuedTomorrow: today ? userData?.queuedTomorrow : false,
+        });
+      } else if (partyMembers.length > 0) {
+        batch.update(userRef, {
+          two_and_two_queued: false,
+          queuedToday: today ? false : userData?.queuedToday,
+          queuedTomorrow: today ? userData?.queuedTomorrow : false,
+        });
+        // queuedWithPeople = true;
       } else {
-        batch.update(userRef, {meet_three_people_queued: false});
+        batch.update(userRef, {
+          meet_three_people_queued: false,
+          queuedToday: today ? false : userData?.queuedToday,
+          queuedTomorrow: today ? userData?.queuedTomorrow : false,
+        });
       }
 
       // Process documents for the other party members
@@ -66,15 +75,28 @@ export const quitLobby = functions.firestore
             const userRef = admin.firestore().doc(memberRef.path);
             const userDoc = await userRef.get();
             const userData = userDoc.data();
+            const queuedToday = userDoc.data()?.queuedToday;
+            const queuedTomorrow = userDoc.data()?.queuedTomorrow;
 
-            batch.update(userRef, {
-              queuedToday: today ? false : userData?.queuedToday,
-              queuedTomorrow: today ? userData?.queuedTomorrow : false,
-              two_and_two_queued: queuedWithPeople ?
-          false : userData?.two_and_two_queued,
-              meet_three_people_queued: queuedWithPeople ?
-          userData?.meet_three_people_queued : false,
-            });
+            if (queuedToday && queuedTomorrow) {
+              batch.update(userRef, {
+                queuedToday: today ? false : userData?.queuedToday,
+                queuedTomorrow: today ? userData?.queuedTomorrow : false,
+              });
+            } else if (partyMembers.length > 0) {
+              batch.update(userRef, {
+                two_and_two_queued: false,
+                queuedToday: today ? false : userData?.queuedToday,
+                queuedTomorrow: today ? userData?.queuedTomorrow : false,
+              });
+              // queuedWithPeople = true;
+            } else {
+              batch.update(userRef, {
+                meet_three_people_queued: false,
+                queuedToday: today ? false : userData?.queuedToday,
+                queuedTomorrow: today ? userData?.queuedTomorrow : false,
+              });
+            }
           }
         }
       }
@@ -82,19 +104,47 @@ export const quitLobby = functions.firestore
       await batch.commit();
       console.log(`Deleted non-user documents in ${partyType} 
     collections for all users in the party and updated "queuedToday" field.`);
+      if (today) {
+        const member0QuerySnapshot = await admin.firestore()
+            .collection("lobby_tonight")
+            .where("member0", "==", authUidRef).get();
 
-      const lobbyQuerySnapshot = await admin.firestore()
-          .collection("lobby_tonight")
-          .where("member0", "==", authUidRef).get();
+        const member1QuerySnapshot = await admin.firestore()
+            .collection("lobby_tonight")
+            .where("member1", "==", authUidRef).get();
 
-      if (lobbyQuerySnapshot.empty) {
-        console.warn(`Lobby not found for member0 ${authUidRef.path}.`);
-        return null;
+        if (member0QuerySnapshot.empty && member1QuerySnapshot.empty) {
+          console.warn(`Lobby not found for ${authUidRef.path}.`);
+          return null;
+        }
+
+        const lobbyDocRef = member0QuerySnapshot.empty ?
+    member1QuerySnapshot.docs[0].ref :
+    member0QuerySnapshot.docs[0].ref;
+
+        await lobbyDocRef.delete();
+        console.log(`Deleted lobby document ${lobbyDocRef.path}.`);
+      } else {
+        const member0QuerySnapshot = await admin.firestore()
+            .collection("lobby_tomorrow")
+            .where("member0", "==", authUidRef).get();
+
+        const member1QuerySnapshot = await admin.firestore()
+            .collection("lobby_tonight")
+            .where("member1", "==", authUidRef).get();
+
+        if (member0QuerySnapshot.empty && member1QuerySnapshot.empty) {
+          console.warn(`Lobby not found for ${authUidRef.path}.`);
+          return null;
+        }
+
+        const lobbyDocRef = member0QuerySnapshot.empty ?
+  member1QuerySnapshot.docs[0].ref :
+  member0QuerySnapshot.docs[0].ref;
+
+        await lobbyDocRef.delete();
+        console.log(`Deleted lobby document ${lobbyDocRef.path}.`);
       }
-
-      const lobbyDocRef = lobbyQuerySnapshot.docs[0].ref;
-      await lobbyDocRef.delete();
-      console.log(`Deleted lobby document ${lobbyDocRef.path}.`);
 
       return null;
     });
