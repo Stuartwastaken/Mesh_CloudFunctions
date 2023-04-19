@@ -1,5 +1,12 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+// AIzaSyB_CvrQ2rXD8MFPQX8-a09wHgrRlJbtbWg
+
+
+
+
+
+
 
 
 export const joinLobby = functions.firestore

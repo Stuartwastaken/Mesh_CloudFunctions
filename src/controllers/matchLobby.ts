@@ -96,7 +96,7 @@ export const matchLobby = functions.pubsub
             ?.forEach((docId) => matchedDocIds.add(docId));
       });
 
-      // Here is where I want the additional functionality ChatGPT
+      
       const locationRef = firestore
           .collection("location").doc(selectedLocation);
       const locationData = (await locationRef.get()).data();

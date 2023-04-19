@@ -39,14 +39,19 @@ export const quitLobby = functions.firestore
       const userRef = admin.firestore().doc(authUidRef.path);
       const userDoc = await userRef.get();
       const userData = userDoc.data();
-      const queuedToday = userDoc.data()?.queuedToday;
-      const queuedTomorrow = userDoc.data()?.queuedTomorrow;
+      const queuedToday: boolean = userDoc.data()?.queuedToday;
+      const queuedTomorrow: boolean = userDoc.data()?.queuedTomorrow;
+      console.log("queuedToday: ", queuedToday,
+          "queuedTomorrow: ", queuedTomorrow);
 
       if (queuedToday && queuedTomorrow) {
         batch.update(userRef, {
           queuedToday: today ? false : userData?.queuedToday,
           queuedTomorrow: today ? userData?.queuedTomorrow : false,
         });
+        // need to edit this we don't want
+        // to always set two_and_two_queued:false
+        // need another if statement
       } else if (partyMembers.length > 0) {
         batch.update(userRef, {
           two_and_two_queued: false,
@@ -75,8 +80,8 @@ export const quitLobby = functions.firestore
             const userRef = admin.firestore().doc(memberRef.path);
             const userDoc = await userRef.get();
             const userData = userDoc.data();
-            const queuedToday = userDoc.data()?.queuedToday;
-            const queuedTomorrow = userDoc.data()?.queuedTomorrow;
+            const queuedToday: boolean = userDoc.data()?.queuedToday;
+            const queuedTomorrow: boolean = userDoc.data()?.queuedTomorrow;
 
             if (queuedToday && queuedTomorrow) {
               batch.update(userRef, {
