@@ -96,7 +96,7 @@ export const matchLobby = functions.pubsub
             ?.forEach((docId) => matchedDocIds.add(docId));
       });
 
-      
+
       const locationRef = firestore
           .collection("location").doc(selectedLocation);
       const locationData = (await locationRef.get()).data();
