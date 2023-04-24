@@ -7,8 +7,7 @@ import {v4 as uuidv4} from "uuid";
  * considering their age range and common locations.
  */
 export const matchLobby = functions.pubsub
-    .schedule("every 2 minutes")
-    .timeZone("America/Chicago")
+    .schedule("*/1 13-18 * * *")
     .onRun(async (context) => {
       const firestore = admin.firestore();
 

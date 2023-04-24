@@ -13,4 +13,4 @@ export * from "./controllers/recreateLobbyTonight";
 export * from "./controllers/blockUser";
 export * from "./controllers/joinFriendTonight";
 export * from "./controllers/joinFriendTomorrow";
-export * from "./controllers/newMatchLobby";
+

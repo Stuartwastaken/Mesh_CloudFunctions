@@ -8,6 +8,8 @@ export const joinFriendTonight = functions.firestore
           .data()?.authUid as FirebaseFirestore.DocumentReference;
       const otherUidRef = snapshot
           .data()?.otherUid as FirebaseFirestore.DocumentReference;
+      const geoLocation = snapshot.data().geo_location;
+
 
       if (!authUidRef || !otherUidRef) {
         console.warn("authUid or otherUid not found.");
@@ -70,6 +72,7 @@ export const joinFriendTonight = functions.firestore
       await joinLobbyTempbinRef.set({
         today: true,
         party: [authUidRef, otherUidRef],
+        geo_location: geoLocation,
       });
 
       console.log(`Added authUid and otherUid

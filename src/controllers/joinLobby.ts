@@ -1,28 +1,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-
-const searchRadius = 50; // Radius in km
-
-/**
- * Retrieves the city name from a given latitude and
- * longitude using the Google Maps Geocoding API.
- * @param {number} latitude - The latitude of the location.
- * @param {number} longitude - The longitude of the location.
- * @return {Promise<string|null>} A Promise that resolves to the city name,
- *  or null if the city cannot be determined.
- */
-async function getCityFromLatLng(latitude: number, longitude: number):
- Promise<string | null> {
-  for (const city of majorCities) {
-    const distance = haversineDistance(latitude,
-        longitude, city.latitude, city.longitude);
-    if (distance <= searchRadius) {
-      return city.name;
-    }
-  }
-
-  return null;
-}
+import {unqueueUser} from "../utils/unqueueUser";
+import {getCityFromLatLng} from "../utils/getCityFromLatLng";
 
 
 export const joinLobby = functions.firestore
@@ -54,9 +33,18 @@ export const joinLobby = functions.firestore
           if (userData) {
             if (userData.liked_places) {
               partyLocations.push(...userData.liked_places);
-              if (city) {
+              if (city === null) {
+                const userRef = admin.firestore()
+                    .collection("user").doc(partyMembers[0].id);
+                await unqueueUser(today, userRef);
+              } else {
                 partyLocations = partyLocations
                     .filter((location) => location.path.endsWith(city));
+                if (partyLocations.length === 0) {
+                  const userRef = admin.firestore()
+                      .collection("user").doc(partyMembers[0].id);
+                  await unqueueUser(today, userRef);
+                }
               }
             } else {
               console.error(`The 'liked_places' field does not exist in the user
@@ -105,9 +93,18 @@ export const joinLobby = functions.firestore
           if (userData) {
             if (userData.liked_places) {
               partyLocations.push(...userData.liked_places);
-              if (city) {
+              if (city === null) {
+                const userRef = admin.firestore()
+                    .collection("user").doc(partyMembers[0].id);
+                await unqueueUser(today, userRef);
+              } else {
                 partyLocations = partyLocations
                     .filter((location) => location.path.endsWith(city));
+                if (partyLocations.length === 0) {
+                  const userRef = admin.firestore()
+                      .collection("user").doc(partyMembers[0].id);
+                  await unqueueUser(today, userRef);
+                }
               }
             } else {
               console.error(`The 'liked_places' field does not exist in the user
@@ -143,67 +140,4 @@ export const joinLobby = functions.firestore
       }
     });
 
-
-    interface City {
-      name: string;
-      latitude: number;
-      longitude: number;
-    }
-
-const majorCities: City[] = [
-  {
-    name: "Chicago_Illinois",
-    latitude: 41.8781,
-    longitude: -87.6298,
-  },
-  {
-    name: "Madison_Wisconsin",
-    latitude: 43.0838,
-    longitude: -89.4411,
-  },
-  {
-    name: "Miami_Florida",
-    latitude: 25.7617,
-    longitude: -80.1918,
-  },
-  {
-    name: "SaintLouis_Missouri",
-    latitude: 38.6270,
-    longitude: -90.1994,
-  },
-  // ... add more major cities and their coordinates
-];
-
-
-/**
- * Calculate the Haversine distance between two latitude and longitude points.
- *
- * @param {number} lat1 - The latitude of the first point.
- * @param {number} lon1 - The longitude of the first point.
- * @param {number} lat2 - The latitude of the second point.
- * @param {number} lon2 - The longitude of the second point.
- * @return {number} The Haversine distance in kilometers between the two points.
- */
-function haversineDistance(lat1: number, lon1: number,
-    lat2: number, lon2: number): number {
-  const R = 6371; // Earth's radius in km
-  const dLat = toRadians(lat2 - lat1);
-  const dLon = toRadians(lon2 - lon1);
-  const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(toRadians(lat1)) * Math.cos(
-            toRadians(lat2)) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
-
-/**
- *
- * @param {number} degrees - The degree you would like to convert.
- * @return {number} The radians equivalent of the degrees input.
- */
-function toRadians(degrees: number): number {
-  return (degrees * Math.PI) / 180;
-}
 
