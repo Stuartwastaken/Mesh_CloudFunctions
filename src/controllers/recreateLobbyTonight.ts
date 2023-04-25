@@ -3,7 +3,7 @@ import * as admin from "firebase-admin";
 import {unqueueUser} from "../utils/unqueueUser";
 
 export const recreateLobbyTonight = functions.pubsub
-    .schedule("0 0 * * *")
+    .schedule("every 3 minutes")
     .onRun(async () => {
       const lobbyTonightRef = admin.firestore().collection("lobby_tonight");
       const lobbyTomorrowRef = admin.firestore().collection("lobby_tomorrow");
@@ -25,7 +25,7 @@ export const recreateLobbyTonight = functions.pubsub
       lobbyTonightSnapshot.forEach((doc) => {
         const data = doc.data();
 
-        const member0 = data.member0?.id;
+        const member0 : FirebaseFirestore.DocumentReference = data?.member0;
         unqueueUserPromises.push(unqueueUser(true, member0));
         batch1.delete(doc.ref);
       });
