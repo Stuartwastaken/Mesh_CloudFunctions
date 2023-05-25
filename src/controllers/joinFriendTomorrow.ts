@@ -29,6 +29,20 @@ export const joinFriendTomorrow = functions.firestore
         console.log(`${otherUidRef.id} is already in queue`);
         return null;
       }
+      // Check if liked_places is empty or null
+      const authUidLikedPlaces = authUidSnapshot.data()?.liked_places;
+      const otherUidLikedPlaces = otherUidSnapshot.data()?.liked_places;
+
+      if (!authUidLikedPlaces || authUidLikedPlaces.length === 0) {
+        console.log(`${authUidRef.id} has empty or null liked_places`);
+        return null;
+      }
+
+      if (!otherUidLikedPlaces || otherUidLikedPlaces.length === 0) {
+        console.log(`${otherUidRef.id} has empty or null liked_places`);
+        return null;
+      }
+
       const batch = admin.firestore().batch();
 
       // Write to authUid's party_today subcollection

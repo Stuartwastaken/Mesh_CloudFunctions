@@ -2,6 +2,7 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import {unqueueUser} from "../utils/unqueueUser";
 import {getCityFromLatLng} from "../utils/getCityFromLatLng";
+import {notifyUser} from "./sendNotifications";
 
 
 export const joinLobby = functions.firestore
@@ -22,12 +23,29 @@ export const joinLobby = functions.firestore
       if (today) {
         const lobbyTonightRef = admin.firestore().collection("lobby_tonight");
         const partyDocRef = lobbyTonightRef.doc();
+        const userRef = admin.firestore().collection("user");
+        const userDoc = await userRef.doc(partyMembers[0].id).get();
+        const message = `Your liked locations are not open today.
+Please choose other locations.`;
+        await notifyUser(userDoc.id, message);
+
 
         const batch = admin.firestore().batch();
-        const userRef = admin.firestore().collection("user");
         let partyLocations = [];
 
-        const userDoc = await userRef.doc(partyMembers[0].id).get();
+        // Query the lobby_tonight collection for
+        // documents with userDoc as member0 or member1
+        const member0Query = await lobbyTonightRef
+            .where("member0", "==", userDoc.ref).get();
+        const member1Query = await lobbyTonightRef
+            .where("member1", "==", userDoc.ref).get();
+
+        // Check if any documents are returned in either query
+        if (!member0Query.empty || !member1Query.empty) {
+          console.log(`User ${userDoc.id} is already 
+          in lobby_tonight as member0 or member1`);
+          return null;
+        }
         if (userDoc.exists) {
           const userData = userDoc.data();
           if (userData) {
@@ -81,13 +99,26 @@ export const joinLobby = functions.firestore
       } else if (!today) {
         const lobbyTomorrowRef = admin.firestore().collection("lobby_tomorrow");
         const partyDocRef = lobbyTomorrowRef.doc();
-
-
-        const batch = admin.firestore().batch();
         const userRef = admin.firestore().collection("user");
+        const userDoc = await userRef.doc(partyMembers[0].id).get();
+        const batch = admin.firestore().batch();
         let partyLocations = [];
 
-        const userDoc = await userRef.doc(partyMembers[0].id).get();
+        // Query the lobby_tonight collection for
+        // documents with userDoc as member0 or member1
+        const member0Query = await lobbyTomorrowRef
+            .where("member0", "==", userDoc.ref).get();
+        const member1Query = await lobbyTomorrowRef
+            .where("member1", "==", userDoc.ref).get();
+
+        // Check if any documents are returned in either query
+        if (!member0Query.empty || !member1Query.empty) {
+          console.log(`User ${userDoc.id} is already
+           in lobby_tonight as member0 or member1`);
+          return null;
+        }
+
+
         if (userDoc.exists) {
           const userData = userDoc.data();
           if (userData) {

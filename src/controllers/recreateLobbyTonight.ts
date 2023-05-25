@@ -3,7 +3,7 @@ import * as admin from "firebase-admin";
 import {unqueueUser} from "../utils/unqueueUser";
 
 export const recreateLobbyTonight = functions.pubsub
-    .schedule("every 3 minutes")
+    .schedule("0 0 * * *")
     .onRun(async () => {
       const lobbyTonightRef = admin.firestore().collection("lobby_tonight");
       const lobbyTomorrowRef = admin.firestore().collection("lobby_tomorrow");
