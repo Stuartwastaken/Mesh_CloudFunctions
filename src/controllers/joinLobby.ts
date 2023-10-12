@@ -11,7 +11,7 @@ export const joinLobby = functions.firestore
       const partyMembers = snapshot.data().party;
       const today = snapshot.data().today;
       const geoLocation = snapshot.data().geo_location;
-
+      const outingType = snapshot.data().outing_type;
       let city: string | null = null;
 
       if (geoLocation && "latitude" in
@@ -21,7 +21,7 @@ export const joinLobby = functions.firestore
       }
 
       if (today) {
-        const lobbyTonightRef = admin.firestore().collection("lobby_tonight");
+        const lobbyTonightRef = admin.firestore().collection(`lobby_tonight_${outingType}`);
         const partyDocRef = lobbyTonightRef.doc();
         const userRef = admin.firestore().collection("user");
         const userDoc = await userRef.doc(partyMembers[0].id).get();
@@ -35,6 +35,7 @@ Please choose other locations.`;
 
         // Query the lobby_tonight collection for
         // documents with userDoc as member0 or member1
+        // Essentially "are you already queued tonight?"
         const member0Query = await lobbyTonightRef
             .where("member0", "==", userDoc.ref).get();
         const member1Query = await lobbyTonightRef
@@ -56,12 +57,26 @@ Please choose other locations.`;
                     .collection("user").doc(partyMembers[0].id);
                 await unqueueUser(today, userRef);
               } else {
-                partyLocations = partyLocations
-                    .filter((location) => location.path.endsWith(city));
-                if (partyLocations.length === 0) {
-                  const userRef = admin.firestore()
-                      .collection("user").doc(partyMembers[0].id);
-                  await unqueueUser(today, userRef);
+                try {
+                  for (const location of partyLocations) {
+                    console.log("Before filter: ", location.path);
+                  }
+                  // Filter a user's liked locations within haversine distance
+                  partyLocations =
+                  await filterLocations(partyLocations, city);
+
+                  // Filter these liked locations by whether they are open today
+                  for (const location of partyLocations) {
+                    console.log("After filter: ", location.path);
+                  }
+
+                  if (partyLocations.length === 0) {
+                    const userRef = admin.firestore()
+                        .collection("user").doc(partyMembers[0].id);
+                    await unqueueUser(today, userRef);
+                  }
+                } catch (err) {
+                  console.error(err);
                 }
               }
             } else {
@@ -97,7 +112,7 @@ Please choose other locations.`;
               console.error("Batch write failed: ", error);
             });
       } else if (!today) {
-        const lobbyTomorrowRef = admin.firestore().collection("lobby_tomorrow");
+        const lobbyTomorrowRef = admin.firestore().collection(`lobby_tomorrow_${outingType}`);
         const partyDocRef = lobbyTomorrowRef.doc();
         const userRef = admin.firestore().collection("user");
         const userDoc = await userRef.doc(partyMembers[0].id).get();
@@ -129,12 +144,26 @@ Please choose other locations.`;
                     .collection("user").doc(partyMembers[0].id);
                 await unqueueUser(today, userRef);
               } else {
-                partyLocations = partyLocations
-                    .filter((location) => location.path.endsWith(city));
-                if (partyLocations.length === 0) {
-                  const userRef = admin.firestore()
-                      .collection("user").doc(partyMembers[0].id);
-                  await unqueueUser(today, userRef);
+                try {
+                  for (const location of partyLocations) {
+                    console.log("Before filter: ", location.path);
+                  }
+                  // Filter a user's liked locations within haversine distance
+                  partyLocations =
+                  await filterLocations(partyLocations, city);
+
+                  // Filter these liked locations by whether they are open today
+                  for (const location of partyLocations) {
+                    console.log("After filter: ", location.path);
+                  }
+
+                  if (partyLocations.length === 0) {
+                    const userRef = admin.firestore()
+                        .collection("user").doc(partyMembers[0].id);
+                    await unqueueUser(today, userRef);
+                  }
+                } catch (err) {
+                  console.error(err);
                 }
               }
             } else {
@@ -168,6 +197,56 @@ Please choose other locations.`;
             .catch((error) => {
               console.error("Batch write failed: ", error);
             });
+      }
+      /**
+       * Returns the current day name in the format: "open_<day>_1800".
+       * The day is calculated based on the America/Chicago time zone.
+       * @return {string} The current day name in the "open_<day>_1800" format.
+       */
+      function getTodayFieldName(): string {
+        const today = new Date();
+        const options: Intl.DateTimeFormatOptions =
+        {weekday: "long", timeZone: "America/Chicago"};
+        const dayName = new Intl.DateTimeFormat("en-US", options)
+            .format(today).toLowerCase();
+        return `open_${dayName}_1800`;
+      }
+
+      /**
+       * Checks if a location is open today.
+       * This function reads the Firestore document at the
+       * provided path and checks the boolean field "open_<today>_1800".
+       * @param {string} locationPath - The Firestore document path.
+       * @return {Promise<boolean>} A promise that resolves with
+       *  a boolean indicating whether the location is open today.
+       */
+      async function isOpenToday(locationPath: string): Promise<boolean> {
+        const doc = await admin.firestore().doc(locationPath).get();
+        const todayFieldName = getTodayFieldName();
+        return doc.exists && doc.get(todayFieldName) === true;
+      }
+
+      /**
+       * Checks if an array of locations are open today and filters the array.
+       * This function filters the locations by their city and
+       * then checks each Firestore document to see if they are open today.
+       * @param {any[]} partyLocations - An array of objects,
+       *  each containing a Firestore document path.
+       * @param {string} city - The city to filter locations by.
+       * @return {Promise<any[]>} A promise that resolves with
+       *  the filtered array of locations open today.
+       */
+      async function filterLocations(partyLocations: any[], city: string):
+       Promise<any[]> {
+        partyLocations = partyLocations
+            .filter((location) => location.path.endsWith(city));
+
+        // Use Promise.all to wait for all promises to resolve
+        const locationsOpenToday = await Promise
+            .all(partyLocations.map((location) => isOpenToday(location.path)));
+
+        // Filter out locations that are not open today
+        return partyLocations.filter((_, index) => locationsOpenToday[index]);
       }
     });
 
