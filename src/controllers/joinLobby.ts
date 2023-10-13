@@ -11,7 +11,15 @@ export const joinLobby = functions.firestore
       const partyMembers = snapshot.data().party;
       const today = snapshot.data().today;
       const geoLocation = snapshot.data().geo_location;
-      const outingType = snapshot.data().outing_type;
+      const outingType = snapshot.data().outing_type as string;
+
+      if (outingType == null) {
+        console.log(`outingType is null, 
+        stopping cloud function. 
+        Likely that the user has a version of 
+        the app that does not support outingType.`);
+        return null;
+      }
       let city: string | null = null;
 
       if (geoLocation && "latitude" in
@@ -21,7 +29,8 @@ export const joinLobby = functions.firestore
       }
 
       if (today) {
-        const lobbyTonightRef = admin.firestore().collection(`lobby_tonight_${outingType}`);
+        const lobbyTonightRef = admin.firestore()
+            .collection(`lobby_tonight_${outingType}`);
         const partyDocRef = lobbyTonightRef.doc();
         const userRef = admin.firestore().collection("user");
         const userDoc = await userRef.doc(partyMembers[0].id).get();
@@ -112,7 +121,8 @@ Please choose other locations.`;
               console.error("Batch write failed: ", error);
             });
       } else if (!today) {
-        const lobbyTomorrowRef = admin.firestore().collection(`lobby_tomorrow_${outingType}`);
+        const lobbyTomorrowRef = admin.firestore()
+            .collection(`lobby_tomorrow_${outingType}`);
         const partyDocRef = lobbyTomorrowRef.doc();
         const userRef = admin.firestore().collection("user");
         const userDoc = await userRef.doc(partyMembers[0].id).get();
