@@ -49,9 +49,6 @@ export const quitLobby = functions.firestore
           queuedToday: today ? false : userData?.queuedToday,
           queuedTomorrow: today ? userData?.queuedTomorrow : false,
         });
-        // need to edit this we don't want
-        // to always set two_and_two_queued:false
-        // need another if statement
       } else if (partyMembers.length > 0) {
         batch.update(userRef, {
           two_and_two_queued: false,

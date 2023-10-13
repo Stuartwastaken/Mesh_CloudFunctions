@@ -6,12 +6,12 @@ import {v4 as uuidv4} from "uuid";
  * Matches parties in the lobby,
  * considering their age range and common locations.
  */
-export const matchLobby = functions.pubsub
-    .schedule("*/1 2-18 * * *")
+export const matchLobbyCoffee = functions.pubsub
+    .schedule("*/1 2-9 * * *")
     .onRun(async (context) => {
       const firestore = admin.firestore();
 
-      const lobbyTonightRef = firestore.collection("lobby_tonight");
+      const lobbyTonightRef = firestore.collection("lobby_tonight_coffee");
       const lobbyTonightSnapshot = await lobbyTonightRef.get();
 
       if (lobbyTonightSnapshot.empty) {
