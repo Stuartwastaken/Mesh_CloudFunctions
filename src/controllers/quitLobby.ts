@@ -7,7 +7,7 @@ export const quitLobby = functions.firestore
       const partyMembers: FirebaseFirestore.DocumentReference[] =
       snapshot.data()?.party;
       const today = snapshot.data()?.today;
-      // let queuedWithPeople = false;
+      const outingType = snapshot.data().outing_type as string;
 
       if (!partyMembers || partyMembers.length === 0) {
         console
@@ -108,11 +108,11 @@ export const quitLobby = functions.firestore
     collections for all users in the party and updated "queuedToday" field.`);
       if (today) {
         const member0QuerySnapshot = await admin.firestore()
-            .collection("lobby_tonight")
+            .collection(`lobby_tonight_${outingType}`)
             .where("member0", "==", authUidRef).get();
 
         const member1QuerySnapshot = await admin.firestore()
-            .collection("lobby_tonight")
+            .collection(`lobby_tonight_${outingType}`)
             .where("member1", "==", authUidRef).get();
 
         if (member0QuerySnapshot.empty && member1QuerySnapshot.empty) {
@@ -128,11 +128,11 @@ export const quitLobby = functions.firestore
         console.log(`Deleted lobby document ${lobbyDocRef.path}.`);
       } else {
         const member0QuerySnapshot = await admin.firestore()
-            .collection("lobby_tomorrow")
+            .collection(`lobby_tomorrow_${outingType}`)
             .where("member0", "==", authUidRef).get();
 
         const member1QuerySnapshot = await admin.firestore()
-            .collection("lobby_tonight")
+            .collection(`lobby_tonight_${outingType}`)
             .where("member1", "==", authUidRef).get();
 
         if (member0QuerySnapshot.empty && member1QuerySnapshot.empty) {

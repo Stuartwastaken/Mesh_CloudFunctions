@@ -1,39 +1,40 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-import {unqueueUser} from "../utils/unqueueUser";
+import { unqueueUser } from "../utils/unqueueUser";
 
 export const recreateLobbyTonight = functions.pubsub
     .schedule("0 0 * * *")
     .onRun(async () => {
-      const lobbyTonightRef = admin.firestore().collection("lobby_tonight");
-      const lobbyTomorrowRef = admin.firestore().collection("lobby_tomorrow");
-      const groupedTonightRef = admin.firestore().collection("grouped_tonight");
+        const outingTypes = ["coffee", "dinner"];
 
-      const batch1 = admin.firestore().batch();
-      const batch2 = admin.firestore().batch();
-      const batch3 = admin.firestore().batch();
+        for (const outingType of outingTypes) {
+            const lobbyTonightRef = admin.firestore().collection(`lobby_tonight_${outingType}`);
+            const lobbyTomorrowRef = admin.firestore().collection(`lobby_tomorrow_${outingType}`);
+            const groupedTonightRef = admin.firestore().collection("grouped_tonight");
 
-      // Delete all documents in the "lobby_tonight" collection
-      const lobbyTonightSnapshot = await lobbyTonightRef.get();
+            const batch1 = admin.firestore().batch();
+            const batch2 = admin.firestore().batch();
+            const batch3 = admin.firestore().batch();
 
-      if (lobbyTonightSnapshot.empty) {
-        console.log("No documents found in lobby_tonight.");
-      }
+            const lobbyTonightSnapshot = await lobbyTonightRef.get();
+            const unqueueUserPromises: Promise<void>[] = [];
 
-      const unqueueUserPromises: Promise<void>[] = [];
+            if (lobbyTonightSnapshot.empty) {
+                console.log(`No documents found in lobby_tonight_${outingType}.`);
+            }
 
-      lobbyTonightSnapshot.forEach((doc) => {
-        const data = doc.data();
+            lobbyTonightSnapshot.forEach((doc) => {
+                const data = doc.data();
+                const member0: FirebaseFirestore.DocumentReference = data?.member0;
+                unqueueUserPromises.push(unqueueUser(true, member0));
+                batch1.delete(doc.ref);
+            });
 
-        const member0 : FirebaseFirestore.DocumentReference = data?.member0;
-        unqueueUserPromises.push(unqueueUser(true, member0));
-        batch1.delete(doc.ref);
-      });
-
-      await Promise.all(unqueueUserPromises);
-      await batch1.commit();
-
-      console
+            await Promise.all(unqueueUserPromises);
+            await batch1.commit();
+            
+            
+            console
           .log("Batch1 - All unqueueUser calls completed and batch committed.");
       // end of lobbyTonightRef
 
@@ -83,48 +84,42 @@ export const recreateLobbyTonight = functions.pubsub
 
         batch2.delete(doc.ref);
       }
-      await batch2.commit();
+            await batch2.commit();
 
+            const lobbyTomorrowSnapshot = await lobbyTomorrowRef.get();
+            lobbyTomorrowSnapshot.forEach((doc) => {
+                const data = doc.data();
 
-      console
-          .log("Batch2 - Successfully updated 'grouped_tonight' collection.");
-      // Copy all documents from the "lobby_tomorrow"
-      // collection to the "lobby_tonight" collection
-      const lobbyTomorrowSnapshot = await lobbyTomorrowRef.get();
-      lobbyTomorrowSnapshot.forEach((doc) => {
-        const data = doc.data();
+                if (data.member0) {
+                    const member0Ref = admin.firestore().doc(data.member0.path);
+                    batch3.update(member0Ref, {
+                        queuedToday: true,
+                        queuedTomorrow: false,
+                    });
+                }
 
-        // Update user documents for member0 and member1 if they exist
-        if (data.member0) {
-          const member0Ref = admin.firestore().doc(data.member0.path);
-          batch3.update(member0Ref, {
-            queuedToday: true,
-            queuedTomorrow: false,
-          });
+                if (data.member1) {
+                    const member0Ref = admin.firestore().doc(data.member0.path);
+                    const member1Ref = admin.firestore().doc(data.member1.path);
+                    batch3.update(member1Ref, {
+                        queuedToday: true,
+                        queuedTomorrow: false,
+                    });
+                    swapPartySubcollections(member0Ref);
+                    swapPartySubcollections(member1Ref);
+                }
+
+                const newDocRef = lobbyTonightRef.doc(doc.id);
+                batch3.set(newDocRef, data);
+                batch3.delete(doc.ref);
+            });
+
+            await batch3.commit();
+            console.log(`Batch3 - Successfully recreated 'lobby_tonight_${outingType}' collection.`);
         }
 
-        if (data.member1) {
-          const member0Ref = admin.firestore().doc(data.member0.path);
-          const member1Ref = admin.firestore().doc(data.member1.path);
-          batch3.update(member1Ref, {
-            queuedToday: true,
-            queuedTomorrow: false,
-          });
-          swapPartySubcollections(member0Ref);
-          swapPartySubcollections(member1Ref);
-        }
-        const newDocRef = lobbyTonightRef.doc(doc.id);
-        batch3.set(newDocRef, data);
-        batch3.delete(doc.ref);
-      });
-
-      await batch3.commit();
-      console
-          .log("Batch3 - Successfully recreated 'lobby_tonight' collection.");
-
-      return null;
+        return null;
     });
-
 
 /**
  * Swaps the contents of the party_today and party_tomorrow subcollections
