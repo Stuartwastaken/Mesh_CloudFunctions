@@ -2,8 +2,6 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import {unqueueUser} from "../utils/unqueueUser";
 import {getCityFromLatLng} from "../utils/getCityFromLatLng";
-import {notifyUser} from "./sendNotifications";
-
 
 export const joinLobby = functions.firestore
     .document("join_lobby_tempbin/{doc}")
@@ -34,9 +32,9 @@ export const joinLobby = functions.firestore
         const partyDocRef = lobbyTonightRef.doc();
         const userRef = admin.firestore().collection("user");
         const userDoc = await userRef.doc(partyMembers[0].id).get();
-        const message = `Your liked locations are not open today.
-Please choose other locations.`;
-        await notifyUser(userDoc.id, message);
+        //         const message = `Your liked locations are not open today.
+        // Please choose other locations.`;
+        //         await notifyUser(userDoc.id, message);
 
 
         const batch = admin.firestore().batch();
@@ -219,7 +217,9 @@ Please choose other locations.`;
         {weekday: "long", timeZone: "America/Chicago"};
         const dayName = new Intl.DateTimeFormat("en-US", options)
             .format(today).toLowerCase();
-        return `open_${dayName}_1800`;
+        // Set hours to 1000 is outingType is coffee, otherwise set to 1800
+        const hours = outingType === "coffee" ? "1000" : "1800";
+        return `open_${dayName}_${hours}`;
       }
 
       /**

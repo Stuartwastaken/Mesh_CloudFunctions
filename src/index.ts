@@ -10,7 +10,7 @@ export * from "./controllers/matchLobbyCoffee";
 export * from "./controllers/matchLobbyDinner";
 export * from "./controllers/quitLobby";
 export * from "./controllers/inviteFriend";
-export * from "./controllers/recreateLobbyTonight";
+export * from "./controllers/recreateLobby";
 export * from "./controllers/blockUser";
 export * from "./controllers/joinFriendTonight";
 export * from "./controllers/joinFriendTomorrow";

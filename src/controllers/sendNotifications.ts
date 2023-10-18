@@ -18,32 +18,36 @@ interface FCMTokenData {
  * @param {string} message - The message to send in the push notification.
  * @return {Promise<void>}
  */
-export async function notifyUser(userId: string,
-    message: string): Promise<void> {
-  const fcmTokensSnapshot = await admin
-      .firestore()
-      .collection("user")
-      .doc(userId)
-      .collection("fcm_tokens")
-      .get();
+export async function notifyUser(userId: string, message: string):
+Promise<void> {
+  const fcmTokensSnapshot = await admin.firestore()
+      .collection("user").doc(userId)
+      .collection("fcm_tokens").get();
 
-  // Loop through all FCM tokens
   for (const doc of fcmTokensSnapshot.docs) {
     const fcmTokenData: FCMTokenData = doc.data() as FCMTokenData;
 
     if (fcmTokenData && fcmTokenData.fcm_token) {
       const payload = {
         notification: {
-          title: "Location update",
+          title: "You've been matched!",
           body: message,
         },
         token: fcmTokenData.fcm_token,
       };
 
-      await admin.messaging().send(payload);
+      try {
+        await admin.messaging().send(payload);
+      } catch (error) {
+        console.error(`Error sending notification to token 
+              ${fcmTokenData.fcm_token}:`, (error as Error).message);
+        // Consider removing the faulty token
+        // from Firestore or take other appropriate actions
+      }
     }
   }
 }
+
 
 /**
  * Cloud Function to send a notification to a specific user.
