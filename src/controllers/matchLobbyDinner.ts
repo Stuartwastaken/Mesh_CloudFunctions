@@ -1,13 +1,15 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import {v4 as uuidv4} from "uuid";
+import {notifyUser} from "./sendNotifications";
 
 /**
  * Matches parties in the lobby,
  * considering their age range and common locations.
  */
 export const matchLobbyDinner = functions.pubsub
-    .schedule("*/1 10-17 * * *")
+    .schedule("*/1 1-9 * * *")
+    .timeZone("America/Chicago")
     .onRun(async (context) => {
       const firestore = admin.firestore();
 
@@ -87,6 +89,17 @@ export const matchLobbyDinner = functions.pubsub
       console.log(`Matched users: 
       ${matchedUsers.join(", ")} at 
       location: ${selectedLocation}`);
+
+      // Notify matched users
+      const userRef = firestore.collection("user");
+      const notificationMessage = "You have been matched " +
+                            "for a dinner at 6 pm!";
+
+
+      for (const userId of matchedUsers) {
+        const userDoc = await userRef.doc(userId).get();
+        await notifyUser(userDoc.id, notificationMessage);
+      }
 
       // Get document IDs for matched users
       const matchedDocIds = new Set<string>();

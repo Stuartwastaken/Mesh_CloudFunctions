@@ -3,7 +3,7 @@ import * as admin from "firebase-admin";
 import {unqueueUser} from "../utils/unqueueUser";
 
 export const recreateLobby = functions.pubsub
-    .schedule("0 0 * * *")
+    .schedule("*/5 * * * *")
     .onRun(async () => {
       const outingTypes = ["coffee", "dinner"];
 

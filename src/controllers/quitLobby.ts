@@ -1,5 +1,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import {notifyUser} from "./sendNotifications";
+
 
 export const quitLobby = functions.firestore
     .document("quit_lobby_tempbin/{doc}")
@@ -30,6 +32,16 @@ export const quitLobby = functions.firestore
 
         if (personUid.id !== authUidRef.id) {
           batch.delete(partyDoc.ref);
+          // notify the other user that they have been unmatched
+          const notificationMessage = {
+            notification: {
+              title: "Unmatched",
+              body: "You have been unmatched from your lobby.",
+            },
+          };
+          await notifyUser(personUid.id, notificationMessage);
+
+
           // Get the user document and append
           // the document reference to the partyMembers array
           const personDocRef = admin.firestore().doc(`user/${personUid.id}`);
@@ -132,7 +144,7 @@ export const quitLobby = functions.firestore
             .where("member0", "==", authUidRef).get();
 
         const member1QuerySnapshot = await admin.firestore()
-            .collection(`lobby_tonight_${outingType}`)
+            .collection(`lobby_tomorrow_${outingType}`)
             .where("member1", "==", authUidRef).get();
 
         if (member0QuerySnapshot.empty && member1QuerySnapshot.empty) {

@@ -10,16 +10,20 @@ interface FCMTokenData {
   fcm_token: string;
 }
 
+interface NotificationMessage {
+  title: string;
+  body: string;
+}
+
 /**
  * Send a push notification to a specific user.
  * @async
  * @function
  * @param {string} userId - The user ID.
- * @param {string} message - The message to send in the push notification.
+ * @param {NotificationMessage} messageObj - The message object containing title and body.
  * @return {Promise<void>}
  */
-export async function notifyUser(userId: string, message: string):
-Promise<void> {
+export async function notifyUser(userId: string, messageObj: NotificationMessage): Promise<void> {
   const fcmTokensSnapshot = await admin.firestore()
       .collection("user").doc(userId)
       .collection("fcm_tokens").get();
@@ -30,8 +34,8 @@ Promise<void> {
     if (fcmTokenData && fcmTokenData.fcm_token) {
       const payload = {
         notification: {
-          title: "You've been matched!",
-          body: message,
+          title: messageObj.title,
+          body: messageObj.body,
         },
         token: fcmTokenData.fcm_token,
       };
@@ -39,14 +43,14 @@ Promise<void> {
       try {
         await admin.messaging().send(payload);
       } catch (error) {
-        console.error(`Error sending notification to token 
-              ${fcmTokenData.fcm_token}:`, (error as Error).message);
+        console.error(`Error sending notification to token ${fcmTokenData.fcm_token}:`, (error as Error).message);
         // Consider removing the faulty token
         // from Firestore or take other appropriate actions
       }
     }
   }
 }
+
 
 
 /**
