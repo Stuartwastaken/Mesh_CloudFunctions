@@ -1,0 +1,33 @@
+[debug] [2024-02-23T20:42:57.481Z] ----------------------------------------------------------------------
+[debug] [2024-02-23T20:42:57.485Z] Command:       /usr/local/bin/firebase /Users/stuart/.cache/firebase/tools/lib/node_modules/firebase-tools/lib/bin/firebase deploy --only functions:joinLobby.ts
+[debug] [2024-02-23T20:42:57.485Z] CLI Version:   11.18.0
+[debug] [2024-02-23T20:42:57.485Z] Platform:      darwin
+[debug] [2024-02-23T20:42:57.485Z] Node Version:  v16.16.0
+[debug] [2024-02-23T20:42:57.497Z] Time:          Fri Feb 23 2024 14:42:57 GMT-0600 (Central Standard Time)
+[debug] [2024-02-23T20:42:57.498Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2024-02-23T20:42:57.514Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2024-02-23T20:42:57.728Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2024-02-23T20:42:57.730Z] > authorizing via signed-in user (stuartray69@gmail.com)
+[debug] [2024-02-23T20:42:57.730Z] [iam] checking project mesh-8f209 for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
+[debug] [2024-02-23T20:42:57.733Z] > refreshing access token with scopes: []
+[debug] [2024-02-23T20:42:57.734Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2024-02-23T20:42:57.735Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2024-02-23T20:42:57.929Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2024-02-23T20:42:57.932Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
+[debug] [2024-02-23T20:42:58.087Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2024-02-23T20:42:58.089Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2024-02-23T20:42:58.103Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/mesh-8f209:testIamPermissions [none]
+[debug] [2024-02-23T20:42:58.103Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/mesh-8f209:testIamPermissions x-goog-quota-user=projects/mesh-8f209
+[debug] [2024-02-23T20:42:58.103Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/mesh-8f209:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2024-02-23T20:42:58.337Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/mesh-8f209:testIamPermissions 200
+[debug] [2024-02-23T20:42:58.340Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/mesh-8f209:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2024-02-23T20:42:58.343Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/mesh-8f209/serviceAccounts/mesh-8f209@appspot.gserviceaccount.com:testIamPermissions [none]
+[debug] [2024-02-23T20:42:58.348Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/mesh-8f209/serviceAccounts/mesh-8f209@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2024-02-23T20:42:58.643Z] <<< [apiv2][status] POST https://iam.googleapis.com/v1/projects/mesh-8f209/serviceAccounts/mesh-8f209@appspot.gserviceaccount.com:testIamPermissions 200
+[debug] [2024-02-23T20:42:58.644Z] <<< [apiv2][body] POST https://iam.googleapis.com/v1/projects/mesh-8f209/serviceAccounts/mesh-8f209@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[info] 
+[info] === Deploying to 'mesh-8f209'...
+[info] 
+[info] i  deploying functions 
+[info] Running command: npm --prefix "$RESOURCE_DIR" run lint

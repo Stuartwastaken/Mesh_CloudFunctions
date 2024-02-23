@@ -17,13 +17,15 @@ interface NotificationMessage {
 
 /**
  * Send a push notification to a specific user.
+ * messageObj must be a valid NotificationMessage object.
  * @async
  * @function
  * @param {string} userId - The user ID.
- * @param {NotificationMessage} messageObj - The message object containing title and body.
+ * @param {NotificationMessage} messageObj
  * @return {Promise<void>}
  */
-export async function notifyUser(userId: string, messageObj: NotificationMessage): Promise<void> {
+export async function notifyUser(userId: string,
+    messageObj: NotificationMessage): Promise<void> {
   const fcmTokensSnapshot = await admin.firestore()
       .collection("user").doc(userId)
       .collection("fcm_tokens").get();
@@ -43,14 +45,14 @@ export async function notifyUser(userId: string, messageObj: NotificationMessage
       try {
         await admin.messaging().send(payload);
       } catch (error) {
-        console.error(`Error sending notification to token ${fcmTokenData.fcm_token}:`, (error as Error).message);
+        console.error("Error sending notification to token" +
+        `${fcmTokenData.fcm_token}:, (error as Error).message`);
         // Consider removing the faulty token
         // from Firestore or take other appropriate actions
       }
     }
   }
 }
-
 
 
 /**
@@ -69,8 +71,12 @@ export const sendNotification = functions.https.onCall(
     ): Promise<{ success: boolean; message: string }> => {
     // Retrieve user ID from the function call data
       const userId: string = data.userId;
-      const message =
-      "Your liked locations are not open today. Please choose other locations.";
+      const message = {
+        title: "You have been unqueued.",
+        body: "Your liked locations are not open today." +
+          "Please choose other locations.",
+      };
+
 
       if (userId) {
         await notifyUser(userId, message);

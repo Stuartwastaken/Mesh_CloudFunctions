@@ -1,5 +1,6 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import {notifyUser} from "./sendNotifications";
 
 export const joinFriendTonight = functions.firestore
     .document("join_friend_tonight_tempbin/{doc}")
@@ -9,6 +10,7 @@ export const joinFriendTonight = functions.firestore
       const otherUidRef = snapshot
           .data()?.otherUid as FirebaseFirestore.DocumentReference;
       const geoLocation = snapshot.data().geo_location;
+      const outingType = snapshot.data().outing_type as string;
 
 
       if (!authUidRef || !otherUidRef) {
@@ -18,6 +20,14 @@ export const joinFriendTonight = functions.firestore
 
       const authUidSnapshot = await authUidRef.get();
       const otherUidSnapshot = await otherUidRef.get();
+
+      console.log("authUidSnapshot.id: ", authUidSnapshot.id);
+      console.log("otherUidSnapshot.id: ", otherUidSnapshot.id);
+
+      if (authUidSnapshot.id === otherUidSnapshot.id) {
+        console.log("authUid and otherUid are the same.");
+        return null;
+      }
 
       if (authUidSnapshot.exists && authUidSnapshot
           .data()?.queuedToday === true) {
@@ -42,6 +52,20 @@ export const joinFriendTonight = functions.firestore
 
       if (!otherUidLikedPlaces || otherUidLikedPlaces.length === 0) {
         console.log(`${otherUidRef.id} has empty or null liked_places`);
+        return null;
+      }
+
+      const otherUidIsQueued = otherUidSnapshot.data()?.queuedToday ||
+      otherUidSnapshot.data()?.queuedTomorrow;
+
+      if (otherUidIsQueued) {
+        console.log(`${otherUidRef.id} is already in queue`);
+        const notificationMessage = {
+          title: "You are already in queue!",
+          body: "Your friend tried to join you" +
+                "but you must leave queue!",
+        };
+        await notifyUser(otherUidRef.id, notificationMessage);
         return null;
       }
 
@@ -88,7 +112,15 @@ export const joinFriendTonight = functions.firestore
         today: true,
         party: [authUidRef, otherUidRef],
         geo_location: geoLocation,
+        outing_type: outingType,
       });
+
+      const notificationMessage = {
+        title: "You are now queued!",
+        body: "Your friend accepted your " +
+              "invite for today!",
+      };
+      await notifyUser(otherUidRef.id, notificationMessage);
 
       console.log(`Added authUid and otherUid
        to the join_lobby_tempbin.`);

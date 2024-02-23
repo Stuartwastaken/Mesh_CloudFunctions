@@ -8,23 +8,23 @@ import {notifyUser} from "./sendNotifications";
  * considering their age range and common locations.
  */
 export const matchLobbyCoffee = functions.pubsub
-    .schedule("*/1 1-9 * * *")
+    .schedule("*/15 1-9 * * 1-6")
     .timeZone("America/Chicago")
     .onRun(async (context) => {
       const firestore = admin.firestore();
 
-      const lobbyTonightRef = firestore.collection("lobby_tonight_coffee");
-      const lobbyTonightSnapshot = await lobbyTonightRef.get();
+      const lobbyCoffeeRef = firestore.collection("lobby_saturday_coffee");
+      const lobbyCoffeeSnapshot = await lobbyCoffeeRef.get();
 
-      if (lobbyTonightSnapshot.empty) {
-        console.log("No documents found in lobby_tonight.");
+      if (lobbyCoffeeSnapshot.empty) {
+        console.log("No documents found in lobby_saturday_coffee.");
         return null;
       }
 
       const userLocations: Map<string, Set<string>> = new Map();
       const docIdsPerUser: Map<string, string[]> = new Map();
 
-      lobbyTonightSnapshot.forEach((doc) => {
+      lobbyCoffeeSnapshot.forEach((doc) => {
         const data = doc.data();
         const locations = data
             ?.locations as FirebaseFirestore.DocumentReference[];
@@ -92,8 +92,11 @@ export const matchLobbyCoffee = functions.pubsub
 
       // Notify matched users
       const userRef = firestore.collection("user");
-      const notificationMessage = "You have been matched " +
-                            "for a coffee at 10 am!";
+      const notificationMessage = {
+        title: "You've been matched!",
+        body: "You have been matched " +
+              "for a coffee at 10 am!",
+      };
 
 
       for (const userId of matchedUsers) {
@@ -161,15 +164,15 @@ export const matchLobbyCoffee = functions.pubsub
  with ${matchedUsers.length} members.`);
 
 
-      // Delete documents from lobby_tonight
+      // Delete documents from lobby_saturday_coffee
       const batch = firestore.batch();
       matchedDocIds.forEach((docId) => {
-        batch.delete(lobbyTonightRef.doc(docId));
+        batch.delete(lobbyCoffeeRef.doc(docId));
       });
 
       await batch.commit();
       console.log(`Deleted ${matchedDocIds.size}
-       documents from lobby_tonight.`);
+       documents from lobby_saturday_coffee.`);
 
       return null;
     });

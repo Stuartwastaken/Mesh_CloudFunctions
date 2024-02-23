@@ -6,7 +6,7 @@ import * as admin from "firebase-admin";
  *  to the quit_lobby_tempbin collection.
  *
  * @param {boolean} todayArg - A boolean indicating
- *  if the user wants to join a lobby today.
+ *  if the user is queued for friday or saturday.
  * @param {FirebaseFirestore.DocumentReference} userRefArg
  * - The user's Firestore document reference.
  * @return {Promise<void>}
@@ -57,7 +57,6 @@ export async function unqueueUser(todayArg: boolean,
       queuedToday: today ? false : userData?.queuedToday,
       queuedTomorrow: today ? userData?.queuedTomorrow : false,
     });
-    // queuedWithPeople = true;
   } else {
     batch.update(userRef, {
       meet_three_people_queued: false,
@@ -110,11 +109,11 @@ export async function unqueueUser(todayArg: boolean,
     collections for all users in the party and updated "queuedToday" field.`);
   if (today) {
     const member0QuerySnapshot = await admin.firestore()
-        .collection("lobby_tonight")
+        .collection("lobby_friday_dinner")
         .where("member0", "==", authUidRef).get();
 
     const member1QuerySnapshot = await admin.firestore()
-        .collection("lobby_tonight")
+        .collection("lobby_friday_dinner")
         .where("member1", "==", authUidRef).get();
 
     if (member0QuerySnapshot.empty && member1QuerySnapshot.empty) {
@@ -130,11 +129,11 @@ export async function unqueueUser(todayArg: boolean,
     console.log(`Deleted lobby document ${lobbyDocRef.path}.`);
   } else {
     const member0QuerySnapshot = await admin.firestore()
-        .collection("lobby_tomorrow")
+        .collection("lobby_saturday_coffee")
         .where("member0", "==", authUidRef).get();
 
     const member1QuerySnapshot = await admin.firestore()
-        .collection("lobby_tonight")
+        .collection("lobby_saturday_coffee")
         .where("member1", "==", authUidRef).get();
 
     if (member0QuerySnapshot.empty && member1QuerySnapshot.empty) {

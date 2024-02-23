@@ -15,3 +15,5 @@ export * from "./controllers/blockUser";
 export * from "./controllers/joinFriendTonight";
 export * from "./controllers/joinFriendTomorrow";
 export * from "./controllers/sendNotifications";
+export * from "./controllers/removeCoffeeUsers";
+export * from "./controllers/removeDinnerUsers";
