@@ -4,15 +4,17 @@
     "noImplicitReturns": true,
     "noUnusedLocals": true,
     "outDir": "lib",
+    "allowJs": true,
     "sourceMap": true,
     "strict": true,
     "target": "es2017",
     "typeRoots": [
       "node_modules/@types"
     ],
+    "esModuleInterop": true,
   },
   "compileOnSave": true,
   "include": [
     "src/**/*.ts"
-  ]
+, "src/controllers/generateTestData.ts", "src/controllers/joinLobby.js"  ]
 }

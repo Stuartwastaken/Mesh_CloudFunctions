@@ -25,7 +25,9 @@ module.exports = {
     "import",
   ],
   rules: {
+    "@typescript-eslint/no-var-requires": "off",
     "quotes": ["error", "double"],
     "import/no-unresolved": 0,
+    "require-jsdoc": 0,
   },
 };

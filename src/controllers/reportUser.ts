@@ -23,13 +23,13 @@ export const reportUser = functions.firestore.
       // Query otherUid's "account_strikes" collection
       // for a document of title strikes
       const otherUsersReports = await admin.firestore()
-          .collection(`user/${otherUid}/account_strikes`)
+          .collection(`users/${otherUid}/account_strikes`)
           .doc(authUid)
           .get();
 
       if (!otherUsersReports.exists) {
         await admin.firestore()
-            .collection(`user/${otherUid}/account_strikes`)
+            .collection(`users/${otherUid}/account_strikes`)
             .doc(authUid)
             .set({
               harassment: harassment,

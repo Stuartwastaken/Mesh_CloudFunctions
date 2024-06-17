@@ -20,21 +20,30 @@ export const addFriend = functions.firestore.
       // Check authUid's "friends" collection
       // for a document of title otherUid
       const authFriendDoc = await admin.firestore()
-          .collection(`user/${authUid}/friends`)
+          .collection(`users/${authUid}/friends`)
           .doc(otherUid)
           .get();
 
       // Query otherUid's "friends" collection for a document of title authUid
       const otherFriendDoc = await admin.firestore()
-          .collection(`user/${otherUid}/friends`)
+          .collection(`users/${otherUid}/friends`)
           .doc(authUid)
           .get();
 
+      if (otherFriendDoc.exists && !otherFriendDoc.data()!.confirmed &&
+          otherFriendDoc.data()!.sent_by_uid.id === authUid) {
+        console.log(`Cannot modify: otherFriendDoc exists, 
+             not confirmed, and was sent by authUid.`);
+        throw new functions.https
+            .HttpsError("not-found", "Was sent already by authUid");
+      }
+
+
       if (!authFriendDoc.exists && !otherFriendDoc.exists) {
         const otherUserDoc = await admin.firestore()
-            .collection("user").doc(otherUid).get();
+            .collection("users").doc(otherUid).get();
         const authUserDoc = await admin.firestore()
-            .collection("user").doc(authUid).get();
+            .collection("users").doc(authUid).get();
 
         if (!otherUserDoc.exists) {
           throw new functions.https
@@ -51,11 +60,11 @@ export const addFriend = functions.firestore.
 
 
         // Create the documents for both authUid and otherUid
-        const authUserRef = admin.firestore().doc(`user/${authUid}`);
-        const otherUserRef = admin.firestore().doc(`user/${otherUid}`);
+        const authUserRef = admin.firestore().doc(`users/${authUid}`);
+        const otherUserRef = admin.firestore().doc(`users/${otherUid}`);
 
         await admin.firestore()
-            .collection(`user/${authUid}/friends`)
+            .collection(`users/${authUid}/friends`)
             .doc(otherUid)
             .set({
               display_name: otherUserData.display_name,
@@ -65,7 +74,7 @@ export const addFriend = functions.firestore.
               sent_by_uid: authUserRef,
             });
         await admin.firestore()
-            .collection(`user/${otherUid}/friends`)
+            .collection(`users/${otherUid}/friends`)
             .doc(authUid)
             .set({
               display_name: authUserData.display_name,
@@ -77,8 +86,28 @@ export const addFriend = functions.firestore.
 
         await snapshot.ref.update({response: "Friend added successfully"});
       } else {
+        const authUserRef = admin.firestore().doc(`users/${authUid}`);
+        const otherUserRef = admin.firestore().doc(`users/${otherUid}`);
+
+
         // If the friend document already exists,
         // set the confirmed field to true
+
+        await admin.firestore()
+            .collection("users")
+            .doc(authUid)
+            .set({
+              friends: admin.firestore.FieldValue.arrayUnion(otherUserRef),
+            }, {merge: true});
+
+
+        await admin.firestore()
+            .collection("users")
+            .doc(otherUid)
+            .set({
+              friends: admin.firestore.FieldValue.arrayUnion(authUserRef),
+            }, {merge: true});
+
 
         await authFriendDoc.ref.update({confirmed: true});
         await otherFriendDoc.ref.update({confirmed: true});

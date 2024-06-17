@@ -8,7 +8,7 @@ import {notifyUser} from "./sendNotifications";
  * considering their age range and common locations.
  */
 export const matchLobbyCoffee = functions.pubsub
-    .schedule("*/15 1-9 * * 1-6")
+    .schedule("* 1-18 * * 1-6")
     .timeZone("America/Chicago")
     .onRun(async (context) => {
       const firestore = admin.firestore();
