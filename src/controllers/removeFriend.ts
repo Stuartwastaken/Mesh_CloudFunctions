@@ -47,7 +47,7 @@ export const removeFriend = functions.firestore.
           .collection("users")
           .doc(authUid)
           .update({
-            friends: admin.firestore.FieldValue.arrayRemove(authRef),
+            friends: admin.firestore.FieldValue.arrayRemove(otherRef),
           });
 
       // Remove authUserRef from otherUid's friends array
@@ -55,7 +55,7 @@ export const removeFriend = functions.firestore.
           .collection("users")
           .doc(otherUid)
           .update({
-            friends: admin.firestore.FieldValue.arrayRemove(otherRef),
+            friends: admin.firestore.FieldValue.arrayRemove(authRef),
           });
 
       await snapshot.ref.update({response: "Friend removed successfully"});

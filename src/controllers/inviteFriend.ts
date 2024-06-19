@@ -64,6 +64,8 @@ export const inviteFriend = functions.firestore.
               confirmed: true,
               sent_by_uid: authUserRef,
             });
+
+
         await admin.firestore()
             .collection(`users/${otherUid}/friends`)
             .doc(authUid)
@@ -96,6 +98,28 @@ export const inviteFriend = functions.firestore.
         // set the confirmed field to true
         await authFriendDoc.ref.update({confirmed: true});
         await otherFriendDoc.ref.update({confirmed: true});
+
+        // Check and add to friends array if necessary
+        const authUserRef = admin.firestore().doc(`users/${authUid}`);
+        const otherUserRef = admin.firestore().doc(`users/${otherUid}`);
+        await admin.firestore()
+            .collection("users")
+            .doc(authUid)
+            .set({
+              friends: admin.firestore.FieldValue.arrayUnion(otherUserRef),
+            }, {merge: true});
+
+        await admin.firestore()
+            .collection("users")
+            .doc(otherUid)
+            .set({
+              friends: admin.firestore.FieldValue.arrayUnion(authUserRef),
+            }, {merge: true});
+
+        await snapshot.ref.update(
+            {response: "Friend already exists, confirmed updated"});
+
+
         await snapshot.ref.update({response: "Friend already exists"});
       }
     });

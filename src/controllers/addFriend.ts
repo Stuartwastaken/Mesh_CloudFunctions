@@ -86,20 +86,20 @@ export const addFriend = functions.firestore.
 
         await snapshot.ref.update({response: "Friend added successfully"});
       } else {
-        const authUserRef = admin.firestore().doc(`users/${authUid}`);
-        const otherUserRef = admin.firestore().doc(`users/${otherUid}`);
-
-
         // If the friend document already exists,
         // set the confirmed field to true
+        await authFriendDoc.ref.update({confirmed: true});
+        await otherFriendDoc.ref.update({confirmed: true});
 
+        // Check and add to friends array if necessary
+        const authUserRef = admin.firestore().doc(`users/${authUid}`);
+        const otherUserRef = admin.firestore().doc(`users/${otherUid}`);
         await admin.firestore()
             .collection("users")
             .doc(authUid)
             .set({
               friends: admin.firestore.FieldValue.arrayUnion(otherUserRef),
             }, {merge: true});
-
 
         await admin.firestore()
             .collection("users")
@@ -108,9 +108,7 @@ export const addFriend = functions.firestore.
               friends: admin.firestore.FieldValue.arrayUnion(authUserRef),
             }, {merge: true});
 
-
-        await authFriendDoc.ref.update({confirmed: true});
-        await otherFriendDoc.ref.update({confirmed: true});
-        await snapshot.ref.update({response: "Friend already exists"});
+        await snapshot.ref.update(
+            {response: "Friend confirmed and added successfully"});
       }
     });
