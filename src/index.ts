@@ -8,6 +8,8 @@ export * from "./controllers/reportUser";
 export * from "./controllers/joinLobby";
 export * from "./controllers/matchLobby";
 export * from "./controllers/downloadCSV";
+export * from "./controllers/getLobbyStats";
+export * from "./controllers/remindLobby";
 // export * from "./controllers/matchLobbyDinner";
 export * from "./controllers/inviteFriend";
 export * from "./controllers/blockUser";

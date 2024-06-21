@@ -9,6 +9,16 @@ const fs = require("fs");
 
 const storage = new Storage();
 
+function normalizePhoneNumber(phone) {
+  // Remove any non-numeric characters
+  const digits = phone.replace(/\D/g, "");
+  // Ensure it starts with country code 1
+  const normalized = digits.startsWith("1") ? digits : "1" + digits;
+  // Return the normalized phone number with +1
+  return `'+${normalized}`;
+}
+
+
 exports.downloadCSV = functions.firestore
     .document("download_csv_tempbin/{docId}")
     .onCreate(async (snapshot, context) => {
@@ -28,14 +38,17 @@ exports.downloadCSV = functions.firestore
         userSnapshot.forEach((doc) => {
           const userData = doc.data();
           users.push({
-            phone_number: userData.phone_number || "",
+            phone_number: normalizePhoneNumber(userData.phone_number || ""),
             display_name: userData.display_name || "",
+            city: userData.current_city || "",
+            birthday: userData.birthday || "",
           });
         });
 
         // Convert JSON to CSV
         const json2csvParser =
-        new Parser({fields: ["phone_number", "display_name"]});
+        new Parser({fields: ["phone_number", "display_name",
+          "city", "birthday"]});
         const csv = json2csvParser.parse(users);
 
         // Define temporary file path
