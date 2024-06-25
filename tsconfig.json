@@ -16,5 +16,8 @@
   "compileOnSave": true,
   "include": [
     "src/**/*.ts"
-, "src/controllers/generateTestData.ts", "src/controllers/joinLobby.js", "src/controllers/downloadCSV.js",  "src/controllers/getLobbyStats.js", "src/controllers/remindLobby.js" ]
+, "src/controllers/generateTestData.ts", "src/controllers/joinLobby.js",
+ "src/controllers/downloadCSV.js",  "src/controllers/getLobbyStats.js",
+  "src/controllers/remindLobby.js", "src/controllers/sendFeedback.js",
+"src/controllers/realsendSmsInvites.js" ]
 }

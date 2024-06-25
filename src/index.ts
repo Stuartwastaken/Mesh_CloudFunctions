@@ -11,8 +11,10 @@ export * from "./controllers/downloadCSV";
 export * from "./controllers/getLobbyStats";
 export * from "./controllers/remindLobby";
 // export * from "./controllers/matchLobbyDinner";
+export * from "./controllers/realsendSmsInvites";
 export * from "./controllers/inviteFriend";
 export * from "./controllers/blockUser";
 export * from "./controllers/generateTestData";
+export * from "./controllers/sendFeedback";
 // export * from "./controllers/sendNotifications";
 
