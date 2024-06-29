@@ -11,10 +11,14 @@ export * from "./controllers/downloadCSV";
 export * from "./controllers/getLobbyStats";
 export * from "./controllers/remindLobby";
 // export * from "./controllers/matchLobbyDinner";
-export * from "./controllers/realsendSmsInvites";
+export * from "./controllers/sendSmsInvites";
 export * from "./controllers/inviteFriend";
 export * from "./controllers/blockUser";
 export * from "./controllers/generateTestData";
 export * from "./controllers/sendFeedback";
+export * from "./controllers/scheduledWednesdayInvite";
+export * from "./controllers/scheduledFridayReminder";
+export * from "./controllers/scheduledFridayMatchCoffee";
+export * from "./controllers/scheduledClearGroupedCollection";
 // export * from "./controllers/sendNotifications";
 
