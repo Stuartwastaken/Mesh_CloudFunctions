@@ -1,30 +1,18 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 
-// work that needs to be done:
-// need to check if you have already
-// added this person as a friend
-
-
-export const addFriend = functions.firestore.
-    document("add_friend_tempbin/{doc}")
+export const addFriend = functions.firestore
+    .document("add_friend_tempbin/{doc}")
     .onCreate(async (snapshot, context) => {
       console.log("context:", JSON.stringify(context));
-      // snapshot.data().authUid extracts from a documents field parameter
-      // for example here the snapshot is from the new document
-      // the documents .data().authUid is from the authUid field
       const authUid = snapshot.data().authUid.id;
       const otherUid = snapshot.data().otherUid.id;
 
-
-      // Check authUid's "friends" collection
-      // for a document of title otherUid
       const authFriendDoc = await admin.firestore()
           .collection(`users/${authUid}/friends`)
           .doc(otherUid)
           .get();
 
-      // Query otherUid's "friends" collection for a document of title authUid
       const otherFriendDoc = await admin.firestore()
           .collection(`users/${otherUid}/friends`)
           .doc(authUid)
@@ -37,7 +25,6 @@ export const addFriend = functions.firestore.
         throw new functions.https
             .HttpsError("not-found", "Was sent already by authUid");
       }
-
 
       if (!authFriendDoc.exists && !otherFriendDoc.exists) {
         const otherUserDoc = await admin.firestore()
@@ -58,8 +45,6 @@ export const addFriend = functions.firestore.
         const otherUserData = otherUserDoc.data() || {};
         const authUserData = authUserDoc.data() || {};
 
-
-        // Create the documents for both authUid and otherUid
         const authUserRef = admin.firestore().doc(`users/${authUid}`);
         const otherUserRef = admin.firestore().doc(`users/${otherUid}`);
 
@@ -84,14 +69,14 @@ export const addFriend = functions.firestore.
               sent_by_uid: authUserRef,
             });
 
+        // Send friend request notification
+        await sendFriendRequestNotification(authUid, otherUid);
+
         await snapshot.ref.update({response: "Friend added successfully"});
       } else {
-        // If the friend document already exists,
-        // set the confirmed field to true
         await authFriendDoc.ref.update({confirmed: true});
         await otherFriendDoc.ref.update({confirmed: true});
 
-        // Check and add to friends array if necessary
         const authUserRef = admin.firestore().doc(`users/${authUid}`);
         const otherUserRef = admin.firestore().doc(`users/${otherUid}`);
         await admin.firestore()
@@ -112,3 +97,44 @@ export const addFriend = functions.firestore.
             {response: "Friend confirmed and added successfully"});
       }
     });
+
+async function sendFriendRequestNotification(authUid: string, otherUid: string) {
+  const authUserDoc = await admin.firestore().collection("users").doc(authUid).get();
+  const authUserData = authUserDoc.data() || {};
+  const authUserName = authUserData.display_name || "Someone";
+
+  const otherUserTokens = await admin.firestore()
+      .collection(`users/${otherUid}/fcm_tokens`)
+      .get();
+
+  const tokens: string[] = [];
+  otherUserTokens.docs.forEach((token) => {
+    if (token.data().fcm_token) {
+      tokens.push(token.data().fcm_token);
+    }
+  });
+
+  if (tokens.length === 0) {
+    console.log("No FCM tokens found for otherUid");
+    return;
+  }
+
+  const message = {
+    notification: {
+      title: "New Friend Request",
+      body: `${authUserName} sent you a friend request!`,
+    },
+    data: {
+      initialPageName: "FriendRequestPage",
+      parameterData: JSON.stringify({senderUid: authUid}),
+    },
+    tokens: tokens,
+  };
+
+  try {
+    const response = await admin.messaging().sendMulticast(message);
+    console.log(`Successfully sent notification to ${response.successCount} devices`);
+  } catch (error) {
+    console.error("Error sending notification:", error);
+  }
+}

@@ -18,7 +18,7 @@ export * from "./controllers/generateTestData";
 export * from "./controllers/sendFeedback";
 export * from "./controllers/scheduledWednesdayInvite";
 export * from "./controllers/scheduledFridayReminder";
-export * from "./controllers/scheduledFridayMatchCoffee";
+export * from "./controllers/scheduledSaturdayMatchCoffee";
 export * from "./controllers/scheduledClearGroupedCollection";
 // export * from "./controllers/sendNotifications";
 

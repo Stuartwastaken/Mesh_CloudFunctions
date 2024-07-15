@@ -42,26 +42,51 @@ exports.ffsendInvites = functions.https.onRequest(async (request, response) => {
         const youngerLocations = processUsers(locations, youngerUsers);
         const batch = admin.firestore().batch();
         let totalInvited = 0;
+        const activeLocations = [];
+
         for (const location of olderLocations.concat(youngerLocations)) {
             console.log(`Location: ${location.name}, Users Invited: ${location.usersLength}`);
             totalInvited += location.usersLength;
 
-           const inviteRef = admin.firestore().collection('send_sms_invites_tempbin').doc();
+            const validUserIds = location.users.reduce((acc, user, index) => {
+                if (user.uid) {
+                    acc.push(user.uid);
+                } else {
+                    console.log(`User at index ${index} in location ${location.id} is missing uid property`);
+                }
+                return acc;
+            }, []);
+
+            const inviteRef = admin.firestore().collection('send_sms_invites_tempbin').doc();
             batch.set(inviteRef, {
                 locationId: location.id,
-                userIds: location.users.map(user => user.uid)
+                userIds: validUserIds
             });
+
+            // Add location to activeLocations array
+            activeLocations.push({
+                locationId: location.id,
+                expirationDate: admin.firestore.Timestamp.fromDate(getNextSunday()),
+                isActive: true
+            });
+        }
+
+        // Write active locations to the 'active_locations' collection
+        for (const activeLocation of activeLocations) {
+            const activeLocationRef = admin.firestore().collection('active_locations').doc(activeLocation.locationId);
+            batch.set(activeLocationRef, activeLocation);
         }
 
         await batch.commit();
 
         console.log(`Total invited users: ${totalInvited}`);
+        console.log(`Active locations set: ${activeLocations.length}`);
 
         if (totalInvited < olderUsers.length + youngerUsers.length) {
             console.warn("Not all users were invited due to capacity constraints");
         }
 
-        response.send("Invites processed");
+        response.send("Invites processed and active locations set");
     } catch (error) {
         console.error("Error processing invites", error);
         response.status(500).send("Error processing invites");
@@ -111,4 +136,13 @@ function shuffle(array) {
         const j = Math.floor(Math.random() * (i + 1));
         [array[i], array[j]] = [array[j], array[i]];
     }
+}
+
+// Helper function to get next Sunday's date
+function getNextSunday() {
+    const today = new Date();
+    const nextSunday = new Date(today);
+    nextSunday.setDate(today.getDate() + (7 - today.getDay()) % 7);
+    nextSunday.setHours(23, 59, 59, 999); // Set to end of day
+    return nextSunday;
 }

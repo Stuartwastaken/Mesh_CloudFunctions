@@ -43,13 +43,14 @@ exports.downloadCSV = functions.firestore
             city: userData.current_city || "",
             birthday: userData.birthday || "",
             uid: userData.uid || "",
+            sex: userData.sex || "",
           });
         });
 
         // Convert JSON to CSV
         const json2csvParser =
         new Parser({fields: ["phone_number", "display_name",
-          "city", "birthday", "uid"]});
+          "city", "birthday", "uid", "sex"]});
         const csv = json2csvParser.parse(users);
 
         // Define temporary file path
