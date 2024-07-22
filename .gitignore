@@ -9,4 +9,6 @@ typings/
 # Node.js dependency directory
 node_modules/
 firebase-debug.*
+firebase-debug.logfirebase-debug.log
+firebase-debug.log
 firebase-debug.log
