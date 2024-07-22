@@ -6,7 +6,6 @@ const path = require("path");
 const os = require("os");
 const fs = require("fs");
 
-
 const storage = new Storage();
 
 function normalizePhoneNumber(phone) {
@@ -17,7 +16,6 @@ function normalizePhoneNumber(phone) {
   // Return the normalized phone number with +1
   return `'+${normalized}`;
 }
-
 
 exports.downloadCSV = functions.firestore
     .document("download_csv_tempbin/{docId}")
@@ -44,13 +42,12 @@ exports.downloadCSV = functions.firestore
             birthday: userData.birthday || "",
             uid: userData.uid || "",
             sex: userData.sex || "",
+            discovery_method: (userData.DiscoveryMethod || []).join(";"),
           });
         });
 
         // Convert JSON to CSV
-        const json2csvParser =
-        new Parser({fields: ["phone_number", "display_name",
-          "city", "birthday", "uid", "sex"]});
+        const json2csvParser = new Parser({fields: ["phone_number", "display_name", "city", "birthday", "uid", "sex", "discovery_method"]});
         const csv = json2csvParser.parse(users);
 
         // Define temporary file path

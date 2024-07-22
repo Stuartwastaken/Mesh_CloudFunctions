@@ -46,7 +46,7 @@ async function processUserChunks(userIds, start, locationId, CHUNK_SIZE) {
       }
 
       const formattedPhoneNumber = formatPhoneNumber(rawPhoneNumber);
-      const textMessage = `Hi ${displayName}, click this link to join us for coffee this Saturday at 10 am:`;
+      const textMessage = `Hi ${displayName}, click this link to join us for coffee this Saturday at 10 am.`;
       const linkMessage = `https://nextjs-mesh-seven.vercel.app/?location=${locationId}&route=invitedConfirm`;
 
       console.log("Sending to: ", formattedPhoneNumber);
