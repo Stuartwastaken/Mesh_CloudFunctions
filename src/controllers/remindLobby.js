@@ -19,12 +19,15 @@ function getNextSaturday() {
   return new Date(today.setDate(today.getDate() + ((6 - today.getDay() + 7) % 7)));
 }
 
-// Function to format the date as "MM_DD_YYYY"
-function formatDate(date) {
+// Function to format the date as "M_D_YYYY" and "MM_DD_YYYY"
+function formatDates(date) {
   const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${month}_${day}_${year}`;
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  return [
+    `${month}_${day}_${year}`,
+    `${String(month).padStart(2, "0")}_${String(day).padStart(2, "0")}_${year}`,
+  ];
 }
 
 exports.remindLobby = functions
@@ -35,24 +38,51 @@ exports.remindLobby = functions
       const city = reminderData.city;
       const timeZone = reminderData.timeZone;
 
-      console.log(`Processing reminders for ${city} in ${timeZone}`);
+      console.log(`[START] Processing reminders for ${city} in ${timeZone}`);
 
-      const nextSaturday = formatDate(getNextSaturday());
-      const subcollectionRef = db.collection("lobby").doc(nextSaturday).collection(city);
-      const snapshot = await subcollectionRef.get();
+      const nextSaturday = getNextSaturday();
+      const [dateFormat1, dateFormat2] = formatDates(nextSaturday);
+      console.log(`Next Saturday formats: ${dateFormat1} and ${dateFormat2}`);
+
+      let subcollectionRef;
+      let snapshot;
+
+      // Try both date formats
+      for (const dateFormat of [dateFormat1, dateFormat2]) {
+        subcollectionRef = db.collection("lobby").doc(dateFormat).collection(city);
+        console.log(`Trying subcollection path: ${subcollectionRef.path}`);
+        snapshot = await subcollectionRef.get();
+        if (!snapshot.empty) {
+          console.log(`Found documents in ${subcollectionRef.path}`);
+          break;
+        }
+      }
+
+      if (!snapshot || snapshot.empty) {
+        console.log(`[WARNING] No documents found in subcollection for ${city}`);
+        return;
+      }
+
+      console.log(`Number of documents in snapshot: ${snapshot.size}`);
 
       const docs = snapshot.docs;
       await processChunks(docs, 0, city, timeZone);
     });
 
 async function processChunks(docs, start, city, timeZone) {
+  console.log(`[CHUNK] Processing chunk starting at index ${start} for ${city}`);
   const chunk = docs.slice(start, start + CHUNK_SIZE);
+  console.log(`Chunk size: ${chunk.length}`);
+
   for (const doc of chunk) {
+    console.log(`[DOC] Processing document ${doc.id}`);
     const userId = doc.get("uid");
     if (userId) {
+      console.log(`User ID found: ${userId}`);
       const userRef = db.collection("users").doc(userId);
       const userDoc = await userRef.get();
       if (userDoc.exists) {
+        console.log(`User document exists for ${userId}`);
         const rawPhoneNumber = userDoc.get("phone_number");
         if (rawPhoneNumber) {
           const formattedPhoneNumber = formatPhoneNumber(rawPhoneNumber);
@@ -60,22 +90,22 @@ async function processChunks(docs, start, city, timeZone) {
           await sendTextReminder(formattedPhoneNumber, city);
           await new Promise((resolve) => setTimeout(resolve, 20));
         } else {
-          console.log(`No phone number found for user ${userId} in ${city}`);
+          console.log(`[WARNING] No phone number found for user ${userId} in ${city}`);
         }
       } else {
-        console.log(`User document not found for ${userId} in ${city}`);
+        console.log(`[ERROR] User document not found for ${userId} in ${city}`);
       }
     } else {
-      console.log(`No user ID found in lobby document for ${city}`);
+      console.log(`[ERROR] No user ID found in lobby document ${doc.id} for ${city}`);
     }
   }
 
   const nextStart = start + CHUNK_SIZE;
   if (nextStart < docs.length) {
-    // Invoke the function recursively to handle the next chunk
+    console.log(`[NEXT CHUNK] Proceeding to next chunk starting at index ${nextStart}`);
     await processChunks(docs, nextStart, city, timeZone);
   } else {
-    console.log(`Finished processing all reminders for ${city} in ${timeZone}`);
+    console.log(`[FINISH] Finished processing all reminders for ${city} in ${timeZone}`);
   }
 }
 
@@ -96,10 +126,10 @@ async function sendTextReminder(formattedPhoneNumber, city) {
       from: twilioPhoneNumber,
       to: formattedPhoneNumber,
     });
-    console.log(`Message sent to ${formattedPhoneNumber}, SID: ${response.sid}`);
+    console.log(`[SUCCESS] Message sent to ${formattedPhoneNumber}, SID: ${response.sid}`);
   } catch (error) {
-    console.error(`Error sending text message to ${formattedPhoneNumber}:`, error);
-    console.error("Error details:", {
+    console.error(`[ERROR] Error sending text message to ${formattedPhoneNumber}:`, error);
+    console.error("[ERROR] Error details:", {
       message: error.message,
       response: error.response,
       code: error.code,

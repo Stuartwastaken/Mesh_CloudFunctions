@@ -3,23 +3,40 @@ const admin = require("firebase-admin");
 const crypto = require("crypto");
 const {Timestamp} = admin.firestore;
 
-exports.scheduledSaturdayMatchCoffee = functions.pubsub
-    .schedule("0 8 * * 6")
-    .timeZone("America/Chicago")
-    .onRun(async (context) => {
-      try {
-        const cities = ["madison_wi", "another_location_id"];
-        for (const city of cities) {
-          await processLocations(city);
-        }
 
-        console.log("Processing complete for all locations.");
-        return null;
-      } catch (error) {
-        console.error("Error during function execution: ", error);
-        return null;
-      }
-    });
+async function getActiveCitiesForTimeZone(timeZone) {
+  const cityConfigsSnapshot = await admin.firestore().collection("city_config")
+      .where("isActive", "==", true)
+      .where("timeZone", "==", timeZone)
+      .get();
+
+  return cityConfigsSnapshot.docs.map((doc) => doc.id);
+}
+
+function createScheduledSaturdayMatchCoffee(timeZone) {
+  return functions.pubsub
+      .schedule("0 8 * * 6")
+      .timeZone(timeZone)
+      .onRun(async (context) => {
+        try {
+          const cities = await getActiveCitiesForTimeZone(timeZone);
+          for (const city of cities) {
+            await processLocations(city);
+          }
+
+          console.log(`Processing complete for all locations in ${timeZone}.`);
+          return null;
+        } catch (error) {
+          console.error(`Error during function execution for ${timeZone}: `, error);
+          return null;
+        }
+      });
+}
+
+exports.scheduledSaturdayMatchCoffeeEastern = createScheduledSaturdayMatchCoffee("America/New_York");
+exports.scheduledSaturdayMatchCoffeeCentral = createScheduledSaturdayMatchCoffee("America/Chicago");
+exports.scheduledSaturdayMatchCoffeeMountain = createScheduledSaturdayMatchCoffee("America/Denver");
+exports.scheduledSaturdayMatchCoffeePacific = createScheduledSaturdayMatchCoffee("America/Los_Angeles");
 
 // Helper function to get the next Saturday
 function getNextSaturday() {
@@ -218,7 +235,6 @@ async function processLocations(city) {
     }
   }
 }
-
 
 async function saveGroupsToFirestore(groups, city, location) {
   const db = admin.firestore();

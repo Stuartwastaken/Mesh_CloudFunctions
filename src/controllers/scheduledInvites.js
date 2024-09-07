@@ -36,7 +36,7 @@ function createScheduledInviteFunction(timeZone) {
 }
 
 async function getActiveCitiesForTimeZone(timeZone) {
-  const cityConfigsSnapshot = await admin.firestore().collection("city_configs")
+  const cityConfigsSnapshot = await admin.firestore().collection("city_config")
       .where("isActive", "==", true)
       .where("timeZone", "==", timeZone)
       .get();

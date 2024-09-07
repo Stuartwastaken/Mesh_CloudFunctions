@@ -12,16 +12,23 @@ const client = twilio(accountSid, authToken);
 
 const CHUNK_SIZE = 10; // Number of messages to send in each invocation
 
-exports.sendFeedback = functions
+exports.sendSorryMessage = functions
     .runWith({timeoutSeconds: 540})
-    .firestore.document("send_feedback_tempbin/{docId}")
+    .firestore.document("sorry_message_tempbin/{docId}")
     .onCreate(async (snap, context) => {
       const newValue = snap.data();
-      const groupedRef = db.collection("grouped");
-      const groupedSnapshot = await groupedRef.get();
+      const location = newValue.location;
+      console.log("newValue: ", newValue);
+      console.log("location: ", location);
 
-      const docs = groupedSnapshot.docs;
-      await processChunks(docs, 0);
+      if (location === "leopolds") {
+        const groupedRef = db.collection("grouped");
+        console.log("Processing the location");
+        const groupedSnapshot = await groupedRef.where("location", "==", "/location/2fdMSdtEAAkDTZWjOimY_Madison_Wisconsin").get();
+
+        const docs = groupedSnapshot.docs;
+        await processChunks(docs, 0);
+      }
     });
 
 async function processChunks(docs, start) {
@@ -36,7 +43,7 @@ async function processChunks(docs, start) {
           if (rawPhoneNumber) {
             const formattedPhoneNumber = formatPhoneNumber(rawPhoneNumber);
             console.log("Sending to: ", formattedPhoneNumber);
-            await sendTextReminder(formattedPhoneNumber);
+            await sendSorryMessage(formattedPhoneNumber);
             await new Promise((resolve) => setTimeout(resolve, 20));
           }
         }
@@ -55,16 +62,8 @@ function formatPhoneNumber(phoneNumber) {
   return phoneNumber.replace(/[^+\d]/g, "");
 }
 
-async function sendTextReminder(formattedPhoneNumber) {
-  const message = `Hi there!
-
-  Thank you for being an awesome part of Mesh! Your feedback is incredibly valuable to us as we continue to grow and improve. If you could spare just 1-3 minutes to share your thoughts, it would mean the world to us. 
-  
-  Click here to start the survey: https://q38b2a3usyo.typeform.com/to/UXqnosSt
-  
-  Thanks a million!
-  The Mesh Team`;
-
+async function sendSorryMessage(formattedPhoneNumber) {
+  const message = "It came to my understanding recently that Leopolds was closed this morning, which is not typical of them. They were short staffed and could not open in time and left a sign posted on the door, since a few employees were sick. I'm so sorry that happened, this week was a fluke and we are sincerely so sorry! We're working hard to make sure that never happens again! Sincerely, Stuart";
 
   try {
     const response = await client.messages.create({
