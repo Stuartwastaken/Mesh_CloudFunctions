@@ -11,11 +11,12 @@ const client = new Twilio(accountSid, authToken);
 
 // Survey link
 const surveyLink = "https://q38b2a3usyo.typeform.com/to/fuSDh8Z5";
+const linkMessage = "https://www.eventbrite.com/e/mesh-community-event-tickets-1039072272137";
 
-exports.sendWeeklySurveySms = functions.pubsub.schedule("0 12 * * 3")
+exports.sendWeeklySurveySms = functions.pubsub.schedule("0 17 * * 2")
     .timeZone("America/Chicago")
     .onRun(async (context) => {
-      console.log("Starting weekly survey SMS function");
+      console.log("Sending out invite to mesh event");
 
       try {
         const usersSnapshot = await admin.firestore()
@@ -36,7 +37,7 @@ exports.sendWeeklySurveySms = functions.pubsub.schedule("0 12 * * 3")
             }
 
             const formattedPhoneNumber = formatPhoneNumber(rawPhoneNumber);
-            const message = `Help us improve! Please take our quick survey: ${surveyLink}`;
+            const message = `Join us for a Mesh outing! All ages are welcome and we encourage you to join us, provide feedback good or bad. Consider this a town hall meeting and get together sponsored by Mesh. RSVP here: ${linkMessage}`;
 
             await sendSms(formattedPhoneNumber, message);
           }));
