@@ -2,6 +2,7 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import {v4 as uuidv4} from "uuid";
 import {notifyUser} from "./sendNotifications";
+// ffMatchLobbyCoffee is deployed, this is a saved old version - deprecrated as of jan/4/2025
 
 /**
  * Matches parties in the lobby,

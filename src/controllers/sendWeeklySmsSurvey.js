@@ -2,7 +2,7 @@ const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const Twilio = require("twilio");
 
-
+// AT ITS CURRENT STATE THIS SENDS OUT AN EVENTBRITE INVITE FOR AN IN PERSON EVENT WE DID IN SUMMER OF 2024
 // Twilio configuration
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -13,7 +13,7 @@ const client = new Twilio(accountSid, authToken);
 const surveyLink = "https://q38b2a3usyo.typeform.com/to/fuSDh8Z5";
 const linkMessage = "https://www.eventbrite.com/e/mesh-community-event-tickets-1039072272137";
 
-exports.sendWeeklySurveySms = functions.pubsub.schedule("0 17 * * 2")
+exports.sendWeeklySmsSurvey = functions.pubsub.schedule("0 17 * * 2")
     .timeZone("America/Chicago")
     .onRun(async (context) => {
       console.log("Sending out invite to mesh event");

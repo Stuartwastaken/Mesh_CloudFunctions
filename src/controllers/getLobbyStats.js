@@ -1,6 +1,8 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const moment = require("moment");
+// this only works for madison_wi as of jan/4/2025
+
 
 function getNextSaturday() {
   const today = new Date();

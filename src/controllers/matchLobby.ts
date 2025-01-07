@@ -1,6 +1,6 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
-
+// NO LONGER USING THIS FUNCTION - DEPRECRATED
 /**
  * @typedef {Object} Person
  * @property {"M" | "F" | "P"} gender - The gender of the person.

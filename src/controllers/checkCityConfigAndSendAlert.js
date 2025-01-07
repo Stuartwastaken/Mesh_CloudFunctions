@@ -24,7 +24,7 @@ exports.checkCityConfigAndSendAlert = functions.pubsub
           const data = doc.data();
           if (data.totalUsers >= 100) {
             const city = data.city || "Unknown City";
-            const message = `Alert, ${city} is greater than 100 users, check firebase immediately and make sure city_config is configured and locations are added!`;
+            const message = `Alert, ${city} is at ${data.totalUsers} users, check firebase immediately and make sure city_config is configured and locations are added!`;
             promises.push(sendTextAlert(message));
           }
         });

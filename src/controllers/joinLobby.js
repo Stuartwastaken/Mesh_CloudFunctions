@@ -1,6 +1,7 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const moment = require("moment-timezone");
+// works for America/Chicago time zone as of jan/4/2025
 
 function getNextSaturday() {
   const today = new Date();

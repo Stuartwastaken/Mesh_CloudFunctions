@@ -5,6 +5,19 @@ if (!admin.apps.length) {
   admin.initializeApp();
 }
 
+// Helper function to get the last digit of current year
+const getYearLastDigit = () => {
+  const year = new Date().getFullYear();
+  return year.toString().slice(-1);
+};
+
+// Helper function to create the regex pattern
+const createDateRegexPattern = () => {
+  const lastDigit = getYearLastDigit();
+  // Pattern matches: 1-2 digits, underscore, 1-2 digits, underscore, 202X (where X is 4 or current year's last digit)
+  return new RegExp(`^\\d{1,2}_\\d{1,2}_202[4-${lastDigit}]$`);
+};
+
 exports.scheduledClearGroupedCollection = functions.pubsub
     .schedule("0 12 * * 0")
     .timeZone("America/Chicago")
@@ -17,11 +30,13 @@ exports.scheduledClearGroupedCollection = functions.pubsub
         const batch = db.batch();
         let deleteCount = 0;
 
+        // Get the current date regex pattern
+        const dateRegex = createDateRegexPattern();
+
         snapshot.forEach((doc) => {
           const docId = doc.id;
-          // Regex to match date format like "6_29_2024"
-          const dateRegex = /^\d{1,2}_\d{1,2}_\d{4}$/;
 
+          // Now using dynamic regex pattern that preserves all valid date formats
           if (!dateRegex.test(docId)) {
             batch.delete(doc.ref);
             deleteCount++;
