@@ -173,7 +173,8 @@ export function getArrStats(arr: number[]): {
  * to create a detailed stats report.
  */
 export const countGroupedMembersStats = functions.pubsub
-    .schedule("every 72 hours")
+    .schedule("0 13 * * 0")
+    .timeZone("America/Chicago")
     .onRun(async () => {
       console.log("Starting to count grouped members.");
 

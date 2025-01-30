@@ -22,5 +22,8 @@ export * from "./controllers/scheduledSaturdayMatchCoffee";
 export * from "./controllers/scheduledClearGroupedCollection";
 export * from "./controllers/sendWelcomeText";
 export * from "./controllers/sendMilwaukeeMessage";
+export * from "./controllers/countPausedUsers";
+export * from "./controllers/generateReferralLink";
+export * from "./controllers/migrate";
 // export * from "./controllers/sendNotifications";
 
