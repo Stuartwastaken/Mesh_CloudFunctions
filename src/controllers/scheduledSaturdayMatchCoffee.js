@@ -394,7 +394,6 @@ async function saveGroupsToFirestore(groups, city, location) {
   const nextSaturday = formatDate(getNextSaturday());
   const locationPath = `grouped/${nextSaturday}/${city}/${location}`;
   let groupNumber = 1;
-  const batch = db.batch();
 
   for (const group of groups) {
     const groupDocRef = db.collection(locationPath).doc();
@@ -409,17 +408,41 @@ async function saveGroupsToFirestore(groups, city, location) {
       group_id: groupDocId,
     };
 
-    batch.set(groupDocRef, groupDoc);
+    await groupDocRef.set(groupDoc);
+
+    const chatRef = db.collection("chats").doc();
+    const chatData = {
+      group_chat_id: generateRandom10DigitNumber(),
+      last_message: "This is your group chat for this week!",
+      last_message_seen_by: membersRefs.slice(0, 2),
+      last_message_sent_by: membersRefs[0],
+      last_message_time: Timestamp.fromDate(new Date()),
+      user_a: membersRefs[0],
+      user_b: membersRefs[1],
+      users: membersRefs,
+    };
+
+    await chatRef.set(chatData);
 
     for (const member of group) {
       const userDocRef = db.collection("users").doc(member.uid);
-      batch.update(userDocRef, { group_id: groupDocId, searching: false });
+      const doc = await userDocRef.get();
+      if (doc.exists) {
+        await userDocRef.update({
+          group_id: groupDocId,
+          searching: false,
+        });
+      } else {
+        console.log(`No document found for UID: ${member.uid}, skipping update.`);
+      }
     }
-  }
 
-  await batch.commit(); // Single write operation
-  console.log(`✅ All groups saved in ${locationPath}`);
+    const queryGroupedDocRef = db.collection("grouped").doc(groupDocId);
+    await queryGroupedDocRef.set(groupDoc);
+    console.log(`Group saved in ${locationPath} and in the global 'grouped' collection with ID ${groupDocId}`);
+  }
 }
+
 async function deleteDocuments(city, location, people) {
   const db = admin.firestore();
   const nextSaturday = formatDate(getNextSaturday());
