@@ -90,6 +90,58 @@ function isFriend(name) {
   return name.includes("(friend)");
 }
 
+function validateGroups(groups) {
+  let validationPassed = true;
+
+  console.log("🔍 Running Validation Checks...");
+
+  // Flatten groups to track all unique users
+  const allUsers = new Set(groups.flat().map((p) => p.uid));
+
+  // Check for blocked users in the same group
+  for (let i = 0; i < groups.length; i++) {
+    const group = groups[i];
+
+    for (let j = 0; j < group.length; j++) {
+      const person = group[j];
+
+      for (let k = 0; k < group.length; k++) {
+        if (j !== k && person.blockedUsers.has(group[k].uid)) {
+          console.error(`❌ Validation Failed: Blocked users in the same group! 
+            ${person.name} (UID: ${person.uid}) is in the same group as 
+            ${group[k].name} (UID: ${group[k].uid})`);
+          validationPassed = false;
+        }
+      }
+    }
+  }
+
+  console.log("✅ Blocked user validation completed.");
+
+  // Check for gender balance
+  for (let i = 0; i < groups.length; i++) {
+    const group = groups[i];
+
+    let maleCount = group.filter((p) => p.gender === "M").length;
+    let femaleCount = group.filter((p) => p.gender === "F").length;
+
+    if ((maleCount === 3 && femaleCount === 1) || (femaleCount === 3 && maleCount === 1)) {
+      console.error(`❌ Validation Failed: Gender imbalance in Group ${i + 1}
+        Males: ${maleCount}, Females: ${femaleCount}`);
+      validationPassed = false;
+    }
+  }
+
+  console.log("✅ Gender balance validation completed.");
+
+  // Final validation summary
+  if (validationPassed) {
+    console.log("✅ All validation checks passed! Groups are correctly formed.");
+  } else {
+    console.warn("⚠️ Some validation checks failed. Please review the errors above.");
+  }
+}
+
 function adjustGenderBalance(groups) {
   for (let i = 0; i < groups.length; i++) {
     const maleCount = groups[i].filter((p) => p.gender === "M").length;
@@ -121,6 +173,73 @@ function waterfall(groups) {
         break;
       }
     }
+  }
+}
+
+function separateBlockedUsers(groups) {
+  const maxAttempts = 5;
+  let attempt = 0;
+  let unresolvedUsers = new Set(); // Track users who couldn't be placed correctly
+
+  while (attempt < maxAttempts) {
+    let conflictFound = false;
+
+    for (let i = 0; i < groups.length; i++) {
+      for (let j = 0; j < groups[i].length; j++) {
+        const person = groups[i][j];
+
+        if (unresolvedUsers.has(person.uid)) continue; // Skip already flagged users
+
+        // Check if this person is in a group with someone they blocked
+        const blockedIndex = groups[i].findIndex((member) =>
+          person.blockedUsers.has(member.uid)
+        );
+
+        if (blockedIndex !== -1) {
+          conflictFound = true;
+          let swapped = false;
+
+          // Step 1: Try swapping with a same-gender person from another group
+          for (let k = 0; k < groups.length; k++) {
+            if (k !== i) {
+              for (let m = 0; m < groups[k].length; m++) {
+                const swapCandidate = groups[k][m];
+
+                if (
+                  swapCandidate.gender === person.gender &&
+                  !groups[i].some((member) =>
+                    swapCandidate.blockedUsers.has(member.uid)
+                  )
+                ) {
+                  console.log(
+                    `🔄 Swapping ${person.name} (Group ${i + 1}) with ${
+                      swapCandidate.name
+                    } (Group ${k + 1})`
+                  );
+                  [groups[i][j], groups[k][m]] = [groups[k][m], groups[i][j]];
+                  swapped = true;
+                  break;
+                }
+              }
+            }
+            if (swapped) break;
+          }
+
+          // Step 2: If no valid swap exists, mark them as unresolved
+          if (!swapped) {
+            unresolvedUsers.add(person.uid);
+            console.warn(`⚠️ Could not place ${person.name} (UID: ${person.uid}) in a valid group.`);
+          }
+        }
+      }
+    }
+
+    if (!conflictFound) break;
+    attempt++;
+  }
+
+  if (unresolvedUsers.size > 0) {
+    console.warn(`⚠️ Final Unresolved Users: ${unresolvedUsers.size} could not be moved out of conflicts.`);
   }
 }
 
@@ -176,6 +295,8 @@ function groupPeople(people) {
     if (groups.flat().length === people.length) {
       adjustGenderBalance(groups);
       waterfall(groups);
+      separateBlockedUsers(groups);
+      validateGroups(groups);
       return groups;
     }
 
@@ -192,9 +313,9 @@ async function getPeopleFromFirestore(city) {
 
   const snapshot = await db.collection(`lobby/${nextSaturday}/${city}`).get();
 
-  snapshot.forEach((doc) => {
+  for (const doc of snapshot.docs) {
     const data = doc.data();
-    const genderMap = {male: "M", female: "F", pna: "P"};
+    const genderMap = { male: "M", female: "F", pna: "P" };
     const dateParts = data.age.split("/");
     let year;
 
@@ -202,24 +323,56 @@ async function getPeopleFromFirestore(city) {
       year = parseInt(dateParts[2], 10);
     } else {
       console.error(`Incorrect date or format for ${data.name}: ${data.age}`);
-      return;
+      continue;
     }
 
-    const locationPath = typeof data.location === "object" && data.location.path ? data.location.path : data.location;
+    const locationPath =
+      typeof data.location === "object" && data.location.path
+        ? data.location.path
+        : data.location;
 
     if (!peopleByLocation[locationPath]) {
       peopleByLocation[locationPath] = [];
     }
+
+    // Fetch blocked users for the current user
+    const blockedUsersSet = await getBlockedUsers(data.uid);
+
     peopleByLocation[locationPath].push({
       uid: data.uid,
       gender: genderMap[data.sex] || "P",
       year,
       name: data.name,
       location: locationPath,
+      blockedUsers: blockedUsersSet, // Attach the blocked users set
     });
-  });
+  }
 
   return peopleByLocation;
+}
+
+async function getBlockedUsers(uid) {
+  const db = admin.firestore();
+  const blockedUsersSet = new Set();
+
+  try {
+    const blockedCollectionRef = db.collection(`users/${uid}/blocked`);
+    const blockedSnapshot = await blockedCollectionRef.get();
+
+    if (blockedSnapshot.empty) return blockedUsersSet; // Avoid unnecessary looping
+
+    blockedSnapshot.forEach((doc) => {
+      const blockedData = doc.data();
+      if (blockedData.uid) {
+        blockedUsersSet.add(blockedData.uid.split("/").pop()); // Extract just the UID
+      }
+    });
+
+  } catch (error) {
+    console.error(`Error fetching blocked users for UID: ${uid}`, error);
+  }
+
+  return blockedUsersSet;
 }
 
 async function processLocations(city) {
@@ -241,6 +394,7 @@ async function saveGroupsToFirestore(groups, city, location) {
   const nextSaturday = formatDate(getNextSaturday());
   const locationPath = `grouped/${nextSaturday}/${city}/${location}`;
   let groupNumber = 1;
+  const batch = db.batch();
 
   for (const group of groups) {
     const groupDocRef = db.collection(locationPath).doc();
@@ -255,41 +409,17 @@ async function saveGroupsToFirestore(groups, city, location) {
       group_id: groupDocId,
     };
 
-    await groupDocRef.set(groupDoc);
-
-    const chatRef = db.collection("chats").doc();
-    const chatData = {
-      group_chat_id: generateRandom10DigitNumber(),
-      last_message: "This is your group chat for this week!",
-      last_message_seen_by: membersRefs.slice(0, 2),
-      last_message_sent_by: membersRefs[0],
-      last_message_time: Timestamp.fromDate(new Date()),
-      user_a: membersRefs[0],
-      user_b: membersRefs[1],
-      users: membersRefs,
-    };
-
-    await chatRef.set(chatData);
+    batch.set(groupDocRef, groupDoc);
 
     for (const member of group) {
       const userDocRef = db.collection("users").doc(member.uid);
-      const doc = await userDocRef.get();
-      if (doc.exists) {
-        await userDocRef.update({
-          group_id: groupDocId,
-          searching: false,
-        });
-      } else {
-        console.log(`No document found for UID: ${member.uid}, skipping update.`);
-      }
+      batch.update(userDocRef, { group_id: groupDocId, searching: false });
     }
-
-    const queryGroupedDocRef = db.collection("grouped").doc(groupDocId);
-    await queryGroupedDocRef.set(groupDoc);
-    console.log(`Group saved in ${locationPath} and in the global 'grouped' collection with ID ${groupDocId}`);
   }
-}
 
+  await batch.commit(); // Single write operation
+  console.log(`✅ All groups saved in ${locationPath}`);
+}
 async function deleteDocuments(city, location, people) {
   const db = admin.firestore();
   const nextSaturday = formatDate(getNextSaturday());
