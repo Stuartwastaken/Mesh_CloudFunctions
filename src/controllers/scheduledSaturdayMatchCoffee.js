@@ -107,7 +107,7 @@ function validateGroups(groups) {
 
       for (let k = 0; k < group.length; k++) {
         if (j !== k && person.blockedUsers.has(group[k].uid)) {
-          console.error(`❌ Validation Failed: Blocked users in the same group! 
+          console.error(`Validation Failed: Blocked users in the same group! 
             ${person.name} (UID: ${person.uid}) is in the same group as 
             ${group[k].name} (UID: ${group[k].uid})`);
           validationPassed = false;
@@ -116,7 +116,7 @@ function validateGroups(groups) {
     }
   }
 
-  console.log("✅ Blocked user validation completed.");
+  console.log("Blocked user validation completed.");
 
   // Check for gender balance
   for (let i = 0; i < groups.length; i++) {
@@ -126,19 +126,19 @@ function validateGroups(groups) {
     let femaleCount = group.filter((p) => p.gender === "F").length;
 
     if ((maleCount === 3 && femaleCount === 1) || (femaleCount === 3 && maleCount === 1)) {
-      console.error(`❌ Validation Failed: Gender imbalance in Group ${i + 1}
+      console.error(`Validation Failed: Gender imbalance in Group ${i + 1}
         Males: ${maleCount}, Females: ${femaleCount}`);
       validationPassed = false;
     }
   }
 
-  console.log("✅ Gender balance validation completed.");
+  console.log("Gender balance validation completed.");
 
   // Final validation summary
   if (validationPassed) {
-    console.log("✅ All validation checks passed! Groups are correctly formed.");
+    console.log("All validation checks passed! Groups are correctly formed.");
   } else {
-    console.warn("⚠️ Some validation checks failed. Please review the errors above.");
+    console.warn("Some validation checks failed. Please review the errors above.");
   }
 }
 
@@ -228,7 +228,7 @@ function separateBlockedUsers(groups) {
           // Step 2: If no valid swap exists, mark them as unresolved
           if (!swapped) {
             unresolvedUsers.add(person.uid);
-            console.warn(`⚠️ Could not place ${person.name} (UID: ${person.uid}) in a valid group.`);
+            console.warn(`Could not place ${person.name} (UID: ${person.uid}) in a valid group.`);
           }
         }
       }
@@ -239,7 +239,7 @@ function separateBlockedUsers(groups) {
   }
 
   if (unresolvedUsers.size > 0) {
-    console.warn(`⚠️ Final Unresolved Users: ${unresolvedUsers.size} could not be moved out of conflicts.`);
+    console.warn(`Final Unresolved Users: ${unresolvedUsers.size} could not be moved out of conflicts.`);
   }
 }
 
