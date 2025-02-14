@@ -93,7 +93,7 @@ function isFriend(name) {
 function validateGroups(groups) {
   let validationPassed = true;
 
-  console.log("🔍 Running Validation Checks...");
+  console.log("Running Validation Checks...");
 
   // Flatten groups to track all unique users
   const allUsers = new Set(groups.flat().map((p) => p.uid));
@@ -212,7 +212,7 @@ function separateBlockedUsers(groups) {
                   )
                 ) {
                   console.log(
-                    `🔄 Swapping ${person.name} (Group ${i + 1}) with ${
+                    `Swapping ${person.name} (Group ${i + 1}) with ${
                       swapCandidate.name
                     } (Group ${k + 1})`
                   );
