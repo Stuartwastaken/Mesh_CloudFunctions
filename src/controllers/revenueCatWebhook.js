@@ -10,63 +10,97 @@ const REVENUECAT_AUTH_HEADER = functions.config().revenuecat.auth_header;
 
 exports.revenueCatWebhook = functions.https.onRequest(async (req, res) => {
   try {
-    console.log("Raw Request Body:", JSON.stringify(req.body, null, 2));
-
-    const {event} = req.body;
-
-    // Extract app_user_id properly from different possible locations
-    let appUserId = req.body.app_user_id || (event && event.app_user_id);
-
-    console.log("Extracted app_user_id:", appUserId);
-
-    if (!appUserId || typeof appUserId !== "string" || !appUserId.trim()) {
-      console.error("Missing or invalid app_user_id:", appUserId);
-      return res.status(400).send("Bad Request: Missing or invalid app_user_id");
-    }
-
-    appUserId = appUserId.trim();
-
     const authHeader = req.headers.authorization;
 
-    // Validate Authorization header
+    // Validate the Authorization header
     if (!authHeader || authHeader !== `Bearer ${REVENUECAT_AUTH_HEADER}`) {
-      console.error("Unauthorized webhook request");
+      console.error(JSON.stringify({
+        message: "Unauthorized webhook request",
+        receivedAuthHeader: authHeader,
+        expectedAuthHeader: `Bearer ${REVENUECAT_AUTH_HEADER}`,
+        timestamp: new Date().toISOString(),
+      }));
       return res.status(403).send("Forbidden: Invalid Authorization Header");
     }
 
-    const userRef = db.collection("users").doc(appUserId);
+    // Extracting necessary fields safely
+    const event = req.body?.event;
+    const app_user_id = event?.app_user_id || req.body?.app_user_id;
+    const entitlements = event?.entitlement_ids || req.body?.entitlements || {};
+    const eventType = event?.type || req.body?.type;
+    const expirationDate = event?.expiration_at_ms || null; // RevenueCat sends expiration timestamp
+
+    console.log(JSON.stringify({
+      message: "Raw request received",
+      requestBody: req.body,
+      extracted_app_user_id: app_user_id,
+      timestamp: new Date().toISOString(),
+    }));
+
+    // Validate app_user_id
+    if (!app_user_id || typeof app_user_id !== "string" || !app_user_id.trim()) {
+      console.error(JSON.stringify({
+        message: "Missing or invalid app_user_id in RevenueCat webhook request",
+        requestBody: req.body,
+        extracted_app_user_id: app_user_id,
+        timestamp: new Date().toISOString(),
+      }));
+      return res.status(400).send("Bad Request: Missing or invalid app_user_id");
+    }
+
+    const userRef = db.collection("users").doc(app_user_id.trim());
     const userDoc = await userRef.get();
 
     if (!userDoc.exists) {
-      console.warn(`User document not found for app_user_id: ${appUserId}`);
+      console.warn(JSON.stringify({
+        message: "User document not found",
+        app_user_id: app_user_id,
+        timestamp: new Date().toISOString(),
+      }));
       return res.status(404).send("User not found");
     }
 
     const userData = userDoc.data();
     const hasLifetimeEntitlement = userData?.has_lifetime_entitlement === true;
 
-    // Ensure entitlements is an object before checking keys
-    const entitlements = event?.entitlement_ids || [];
-    const isVerified = hasLifetimeEntitlement || (Array.isArray(entitlements) && entitlements.length > 0);
+    // Determine if user is verified
+    let isVerified = hasLifetimeEntitlement || (entitlements && Array.isArray(entitlements) && entitlements.length > 0);
 
-    console.log(`User ${appUserId} ${hasLifetimeEntitlement ?
-      "has lifetime entitlement. Keeping verified = true." :
-      isVerified ?
-      "has an active subscription. Setting verified = true." :
-      "does not have an active subscription. Setting verified = false."
-    }`);
+    // If it's an EXPIRATION event, set verified to false
+    if (eventType === "EXPIRATION") {
+      isVerified = false;
+    }
 
-    // Update Firestore only if necessary
+    // If expiration timestamp is in the past, set verified to false
+    if (expirationDate && expirationDate < Date.now()) {
+      isVerified = false;
+    }
+
+    // Log structured data
+    console.log(JSON.stringify({
+      eventType: eventType,
+      app_user_id: app_user_id,
+      entitlements: entitlements,
+      hasLifetimeEntitlement: hasLifetimeEntitlement,
+      isVerified: isVerified,
+      expirationDate: expirationDate ? new Date(expirationDate).toISOString() : "None",
+      firestoreUpdate: userData.verified !== isVerified || userData.super_group !== isVerified ? "Updated" : "No change",
+      timestamp: new Date().toISOString(),
+    }));
+
+    // Only update Firestore if necessary
     if (userData.verified !== isVerified || userData.super_group !== isVerified) {
       await userRef.update({verified: isVerified, super_group: isVerified});
-      console.log(`Updated Firestore: verified = ${isVerified}, super_group = ${isVerified} for user ${appUserId}`);
-    } else {
-      console.log(`No Firestore update needed for user ${appUserId}, verified and super_group status unchanged.`);
     }
 
     res.status(200).send("Success");
   } catch (error) {
-    console.error("Error processing RevenueCat webhook:", error);
+    console.error(JSON.stringify({
+      message: "Error processing RevenueCat webhook",
+      error: error.toString(),
+      stack: error.stack,
+      timestamp: new Date().toISOString(),
+    }));
     res.status(500).send("Internal Server Error");
   }
 });
