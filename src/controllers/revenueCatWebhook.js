@@ -6,31 +6,39 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
-
 const REVENUECAT_AUTH_HEADER = functions.config().revenuecat.auth_header;
 
 exports.revenueCatWebhook = functions.https.onRequest(async (req, res) => {
   try {
-    const {event, app_user_id, entitlements} = req.body;
+    console.log("Raw Request Body:", JSON.stringify(req.body, null, 2));
+
+    const {event} = req.body;
+
+    // Extract app_user_id properly from different possible locations
+    let appUserId = req.body.app_user_id || (event && event.app_user_id);
+
+    console.log("Extracted app_user_id:", appUserId);
+
+    if (!appUserId || typeof appUserId !== "string" || !appUserId.trim()) {
+      console.error("Missing or invalid app_user_id:", appUserId);
+      return res.status(400).send("Bad Request: Missing or invalid app_user_id");
+    }
+
+    appUserId = appUserId.trim();
+
     const authHeader = req.headers.authorization;
 
-    // Validate the Authorization header
+    // Validate Authorization header
     if (!authHeader || authHeader !== `Bearer ${REVENUECAT_AUTH_HEADER}`) {
       console.error("Unauthorized webhook request");
       return res.status(403).send("Forbidden: Invalid Authorization Header");
     }
 
-    // Validate app_user_id
-    if (!app_user_id || typeof app_user_id !== "string" || !app_user_id.trim()) {
-      console.error("Missing or invalid app_user_id in RevenueCat webhook request.");
-      return res.status(400).send("Bad Request: Missing or invalid app_user_id");
-    }
-
-    const userRef = db.collection("users").doc(app_user_id.trim());
+    const userRef = db.collection("users").doc(appUserId);
     const userDoc = await userRef.get();
 
     if (!userDoc.exists) {
-      console.warn(`User document not found for app_user_id: ${app_user_id}`);
+      console.warn(`User document not found for app_user_id: ${appUserId}`);
       return res.status(404).send("User not found");
     }
 
@@ -38,25 +46,22 @@ exports.revenueCatWebhook = functions.https.onRequest(async (req, res) => {
     const hasLifetimeEntitlement = userData?.has_lifetime_entitlement === true;
 
     // Ensure entitlements is an object before checking keys
-    const isVerified =
-      hasLifetimeEntitlement || (entitlements && typeof entitlements === "object" && Object.keys(entitlements).length > 0);
+    const entitlements = event?.entitlement_ids || [];
+    const isVerified = hasLifetimeEntitlement || (Array.isArray(entitlements) && entitlements.length > 0);
 
-    console.log(
-        `User ${app_user_id} ${
-        hasLifetimeEntitlement ?
-          "has lifetime entitlement. Keeping verified = true." :
-          isVerified ?
-          "has an active subscription. Setting verified = true." :
-          "does not have an active subscription. Setting verified = false."
-        }`
-    );
+    console.log(`User ${appUserId} ${hasLifetimeEntitlement ?
+      "has lifetime entitlement. Keeping verified = true." :
+      isVerified ?
+      "has an active subscription. Setting verified = true." :
+      "does not have an active subscription. Setting verified = false."
+    }`);
 
-    // Only update Firestore if necessary
+    // Update Firestore only if necessary
     if (userData.verified !== isVerified || userData.super_group !== isVerified) {
       await userRef.update({verified: isVerified, super_group: isVerified});
-      console.log(`Updated Firestore: verified = ${isVerified}, super_group = ${isVerified} for user ${app_user_id}`);
+      console.log(`Updated Firestore: verified = ${isVerified}, super_group = ${isVerified} for user ${appUserId}`);
     } else {
-      console.log(`No Firestore update needed for user ${app_user_id}, verified and super_group status unchanged.`);
+      console.log(`No Firestore update needed for user ${appUserId}, verified and super_group status unchanged.`);
     }
 
     res.status(200).send("Success");
