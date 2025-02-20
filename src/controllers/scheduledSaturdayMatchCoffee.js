@@ -3,9 +3,10 @@ const admin = require("firebase-admin");
 const crypto = require("crypto");
 const {Timestamp} = admin.firestore;
 
-
 async function getActiveCitiesForTimeZone(timeZone) {
-  const cityConfigsSnapshot = await admin.firestore().collection("city_config")
+  const cityConfigsSnapshot = await admin
+      .firestore()
+      .collection("city_config")
       .where("isActive", "==", true)
       .where("timeZone", "==", timeZone)
       .get();
@@ -27,16 +28,23 @@ function createScheduledSaturdayMatchCoffee(timeZone) {
           console.log(`Processing complete for all locations in ${timeZone}.`);
           return null;
         } catch (error) {
-          console.error(`Error during function execution for ${timeZone}: `, error);
+          console.error(
+              `Error during function execution for ${timeZone}: `,
+              error
+          );
           return null;
         }
       });
 }
 
-exports.scheduledSaturdayMatchCoffeeEastern = createScheduledSaturdayMatchCoffee("America/New_York");
-exports.scheduledSaturdayMatchCoffeeCentral = createScheduledSaturdayMatchCoffee("America/Chicago");
-exports.scheduledSaturdayMatchCoffeeMountain = createScheduledSaturdayMatchCoffee("America/Denver");
-exports.scheduledSaturdayMatchCoffeePacific = createScheduledSaturdayMatchCoffee("America/Los_Angeles");
+exports.scheduledSaturdayMatchCoffeeEastern =
+  createScheduledSaturdayMatchCoffee("America/New_York");
+exports.scheduledSaturdayMatchCoffeeCentral =
+  createScheduledSaturdayMatchCoffee("America/Chicago");
+exports.scheduledSaturdayMatchCoffeeMountain =
+  createScheduledSaturdayMatchCoffee("America/Denver");
+exports.scheduledSaturdayMatchCoffeePacific =
+  createScheduledSaturdayMatchCoffee("America/Los_Angeles");
 
 // Helper function to get the next Saturday
 function getNextSaturday() {
@@ -70,8 +78,11 @@ function shuffleArray(array) {
 
 function calculateStandardDeviation(people) {
   if (people.length === 0) return 0;
-  const mean = people.reduce((acc, person) => acc + person.year, 0) / people.length;
-  const variance = people.reduce((acc, person) => acc + Math.pow(person.year - mean, 2), 0) / people.length;
+  const mean =
+    people.reduce((acc, person) => acc + person.year, 0) / people.length;
+  const variance =
+    people.reduce((acc, person) => acc + Math.pow(person.year - mean, 2), 0) /
+    people.length;
   const stdDev = Math.sqrt(variance);
   return Math.min(stdDev, 5);
 }
@@ -122,10 +133,13 @@ function validateGroups(groups) {
   for (let i = 0; i < groups.length; i++) {
     const group = groups[i];
 
-    let maleCount = group.filter((p) => p.gender === "M").length;
-    let femaleCount = group.filter((p) => p.gender === "F").length;
+    const maleCount = group.filter((p) => p.gender === "M").length;
+    const femaleCount = group.filter((p) => p.gender === "F").length;
 
-    if ((maleCount === 3 && femaleCount === 1) || (femaleCount === 3 && maleCount === 1)) {
+    if (
+      (maleCount === 3 && femaleCount === 1) ||
+      (femaleCount === 3 && maleCount === 1)
+    ) {
       console.error(`Validation Failed: Gender imbalance in Group ${i + 1}
         Males: ${maleCount}, Females: ${femaleCount}`);
       validationPassed = false;
@@ -138,7 +152,9 @@ function validateGroups(groups) {
   if (validationPassed) {
     console.log("All validation checks passed! Groups are correctly formed.");
   } else {
-    console.warn("Some validation checks failed. Please review the errors above.");
+    console.warn(
+        "Some validation checks failed. Please review the errors above."
+    );
   }
 }
 
@@ -151,11 +167,20 @@ function adjustGenderBalance(groups) {
       if (i > 0 && groups[i - 1].filter((p) => p.gender === "F").length >= 3) {
         const femaleToSwap = groups[i - 1].findIndex((p) => p.gender === "F");
         const maleToSwap = groups[i].findIndex((p) => p.gender === "M");
-        [groups[i - 1][femaleToSwap], groups[i][maleToSwap]] = [groups[i][maleToSwap], groups[i - 1][femaleToSwap]];
-      } else if (i < groups.length - 1 && groups[i + 1].filter((p) => p.gender === "F").length >= 3) {
+        [groups[i - 1][femaleToSwap], groups[i][maleToSwap]] = [
+          groups[i][maleToSwap],
+          groups[i - 1][femaleToSwap],
+        ];
+      } else if (
+        i < groups.length - 1 &&
+        groups[i + 1].filter((p) => p.gender === "F").length >= 3
+      ) {
         const femaleToSwap = groups[i + 1].findIndex((p) => p.gender === "F");
         const maleToSwap = groups[i].findIndex((p) => p.gender === "M");
-        [groups[i + 1][femaleToSwap], groups[i][maleToSwap]] = [groups[i][maleToSwap], groups[i + 1][femaleToSwap]];
+        [groups[i + 1][femaleToSwap], groups[i][maleToSwap]] = [
+          groups[i][maleToSwap],
+          groups[i + 1][femaleToSwap],
+        ];
       }
     }
   }
@@ -167,7 +192,10 @@ function waterfall(groups) {
       const needed = 3 - groups[i].length;
       const donorGroup = groups[i - 1];
       if (donorGroup.length > needed) {
-        const membersToMove = donorGroup.splice(donorGroup.length - needed, needed);
+        const membersToMove = donorGroup.splice(
+            donorGroup.length - needed,
+            needed
+        );
         groups[i] = membersToMove.concat(groups[i]);
       } else {
         break;
@@ -179,7 +207,7 @@ function waterfall(groups) {
 function separateBlockedUsers(groups) {
   const maxAttempts = 5;
   let attempt = 0;
-  let unresolvedUsers = new Set(); // Track users who couldn't be placed correctly
+  const unresolvedUsers = new Set(); // Track users who couldn't be placed correctly
 
   while (attempt < maxAttempts) {
     let conflictFound = false;
@@ -212,9 +240,9 @@ function separateBlockedUsers(groups) {
                   )
                 ) {
                   console.log(
-                    `Swapping ${person.name} (Group ${i + 1}) with ${
-                      swapCandidate.name
-                    } (Group ${k + 1})`
+                      `Swapping ${person.name} (Group ${i + 1}) with ${
+                        swapCandidate.name
+                      } (Group ${k + 1})`
                   );
                   [groups[i][j], groups[k][m]] = [groups[k][m], groups[i][j]];
                   swapped = true;
@@ -228,7 +256,9 @@ function separateBlockedUsers(groups) {
           // Step 2: If no valid swap exists, mark them as unresolved
           if (!swapped) {
             unresolvedUsers.add(person.uid);
-            console.warn(`Could not place ${person.name} (UID: ${person.uid}) in a valid group.`);
+            console.warn(
+                `Could not place ${person.name} (UID: ${person.uid}) in a valid group.`
+            );
           }
         }
       }
@@ -239,7 +269,9 @@ function separateBlockedUsers(groups) {
   }
 
   if (unresolvedUsers.size > 0) {
-    console.warn(`Final Unresolved Users: ${unresolvedUsers.size} could not be moved out of conflicts.`);
+    console.warn(
+        `Final Unresolved Users: ${unresolvedUsers.size} could not be moved out of conflicts.`
+    );
   }
 }
 
@@ -315,7 +347,7 @@ async function getPeopleFromFirestore(city) {
 
   for (const doc of snapshot.docs) {
     const data = doc.data();
-    const genderMap = { male: "M", female: "F", pna: "P" };
+    const genderMap = {male: "M", female: "F", pna: "P"};
     const dateParts = data.age.split("/");
     let year;
 
@@ -327,9 +359,9 @@ async function getPeopleFromFirestore(city) {
     }
 
     const locationPath =
-      typeof data.location === "object" && data.location.path
-        ? data.location.path
-        : data.location;
+      typeof data.location === "object" && data.location.path ?
+        data.location.path :
+        data.location;
 
     if (!peopleByLocation[locationPath]) {
       peopleByLocation[locationPath] = [];
@@ -367,7 +399,6 @@ async function getBlockedUsers(uid) {
         blockedUsersSet.add(blockedData.uid.split("/").pop()); // Extract just the UID
       }
     });
-
   } catch (error) {
     console.error(`Error fetching blocked users for UID: ${uid}`, error);
   }
@@ -382,6 +413,7 @@ async function processLocations(city) {
     if (Object.hasOwn(peopleByLocation, location)) {
       const people = peopleByLocation[location];
       const groups = groupPeople(people);
+      console.log("Groups made: ", groups, "For location: ", location);
 
       await saveGroupsToFirestore(groups, city, location);
       await deleteDocuments(city, location, people);
@@ -399,6 +431,7 @@ async function saveGroupsToFirestore(groups, city, location) {
     const groupDocRef = db.collection(locationPath).doc();
     const groupDocId = groupDocRef.id;
     const locationRef = db.doc(location);
+    const randomHashForGroupChatId = generateRandom10DigitNumber();
 
     const membersRefs = group.map((member) => db.doc(`users/${member.uid}`));
     const groupDoc = {
@@ -406,13 +439,14 @@ async function saveGroupsToFirestore(groups, city, location) {
       group_number: groupNumber++,
       location: locationRef,
       group_id: groupDocId,
+      group_chat_id: randomHashForGroupChatId,
     };
 
     await groupDocRef.set(groupDoc);
 
     const chatRef = db.collection("chats").doc();
     const chatData = {
-      group_chat_id: generateRandom10DigitNumber(),
+      group_chat_id: randomHashForGroupChatId,
       last_message: "This is your group chat for this week!",
       last_message_seen_by: membersRefs.slice(0, 2),
       last_message_sent_by: membersRefs[0],
@@ -433,13 +467,17 @@ async function saveGroupsToFirestore(groups, city, location) {
           searching: false,
         });
       } else {
-        console.log(`No document found for UID: ${member.uid}, skipping update.`);
+        console.log(
+            `No document found for UID: ${member.uid}, skipping update.`
+        );
       }
     }
 
     const queryGroupedDocRef = db.collection("grouped").doc(groupDocId);
     await queryGroupedDocRef.set(groupDoc);
-    console.log(`Group saved in ${locationPath} and in the global 'grouped' collection with ID ${groupDocId}`);
+    console.log(
+        `Group saved in ${locationPath} and in the global 'grouped' collection with ID ${groupDocId}`
+    );
   }
 }
 
@@ -447,6 +485,9 @@ async function deleteDocuments(city, location, people) {
   const db = admin.firestore();
   const nextSaturday = formatDate(getNextSaturday());
   for (const person of people) {
-    await db.collection(`lobby/${nextSaturday}/${city}`).doc(person.uid).delete();
+    await db
+        .collection(`lobby/${nextSaturday}/${city}`)
+        .doc(person.uid)
+        .delete();
   }
 }
