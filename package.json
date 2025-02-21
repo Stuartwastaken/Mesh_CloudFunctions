@@ -24,6 +24,7 @@
     "firebase-functions": "^4.7.0",
     "json2csv": "^6.0.0-alpha.2",
     "moment-timezone": "^0.5.45",
+    "node-fetch": "^2.7.0",
     "twilio": "^5.2.0",
     "uuid": "^9.0.0"
   },

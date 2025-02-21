@@ -63,17 +63,18 @@ exports.revenueCatWebhook = functions.https.onRequest(async (req, res) => {
     const userData = userDoc.data();
     const hasLifetimeEntitlement = userData?.has_lifetime_entitlement === true;
 
-    // Determine if user is verified
+    // Determine if user should be verified
     let isVerified = hasLifetimeEntitlement || (entitlements && Array.isArray(entitlements) && entitlements.length > 0);
 
-    // If it's an EXPIRATION event, set verified to false
-    if (eventType === "EXPIRATION") {
+    // If it's an EXPIRATION event or expiration timestamp is in the past, set verified to false
+    if (eventType === "EXPIRATION" || (expirationDate && expirationDate < Date.now())) {
       isVerified = false;
     }
 
-    // If expiration timestamp is in the past, set verified to false
-    if (expirationDate && expirationDate < Date.now()) {
-      isVerified = false;
+    // Preserve super_group if already true, but set to false if premium expires
+    let newSuperGroup = userData.super_group;
+    if (!isVerified) {
+      newSuperGroup = false; // Remove super_group if premium expires
     }
 
     // Log structured data
@@ -84,13 +85,14 @@ exports.revenueCatWebhook = functions.https.onRequest(async (req, res) => {
       hasLifetimeEntitlement: hasLifetimeEntitlement,
       isVerified: isVerified,
       expirationDate: expirationDate ? new Date(expirationDate).toISOString() : "None",
-      firestoreUpdate: userData.verified !== isVerified || userData.super_group !== isVerified ? "Updated" : "No change",
+      firestoreUpdate: userData.verified !== isVerified || userData.super_group !== newSuperGroup ? "Updated" : "No change",
       timestamp: new Date().toISOString(),
     }));
 
     // Only update Firestore if necessary
-    if (userData.verified !== isVerified || userData.super_group !== isVerified) {
-      await userRef.update({verified: isVerified, super_group: isVerified});
+    if (userData.verified !== isVerified || userData.super_group !== newSuperGroup) {
+      await userRef.update({verified: isVerified, super_group: newSuperGroup});
+      console.log(`Updated Firestore for user ${app_user_id}: verified=${isVerified}, super_group=${newSuperGroup}`);
     }
 
     res.status(200).send("Success");
