@@ -19,7 +19,7 @@ const createDateRegexPattern = () => {
 };
 
 exports.scheduledClearGroupedCollection = functions.pubsub
-    .schedule("0 12 * * 0")
+    .schedule("0 21 * * 6")
     .timeZone("America/Chicago")
     .onRun(async (context) => {
       const db = admin.firestore();
@@ -44,7 +44,9 @@ exports.scheduledClearGroupedCollection = functions.pubsub
         });
 
         await batch.commit();
-        console.log(`Deleted ${deleteCount} documents from 'grouped' collection.`);
+        console.log(
+            `Deleted ${deleteCount} documents from 'grouped' collection.`
+        );
         return null;
       } catch (error) {
         console.error("Error clearing grouped collection:", error);
