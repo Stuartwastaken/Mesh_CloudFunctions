@@ -395,8 +395,12 @@ async function getBlockedUsers(uid) {
 
     blockedSnapshot.forEach((doc) => {
       const blockedData = doc.data();
-      if (blockedData.uid) {
-        blockedUsersSet.add(blockedData.uid.split("/").pop()); // Extract just the UID
+      // Check if blockedData.uid is a DocumentReference
+      if (blockedData.uid && blockedData.uid.id) {
+        // If so, use the .id property
+        blockedUsersSet.add(blockedData.uid.id);
+      } else {
+        console.warn("Unexpected type for blockedData.uid:", blockedData.uid);
       }
     });
   } catch (error) {

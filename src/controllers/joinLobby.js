@@ -36,6 +36,25 @@ exports.joinLobby = functions.firestore
       }
 
       const userId = userRef.id;
+      const userDocRef = admin.firestore().collection("users").doc(userId);
+
+      try {
+        const userDoc = await userDocRef.get();
+
+        if (!userDoc.exists) {
+          console.error(`User document for UID ${userId} does not exist.`);
+          return null;
+        }
+
+        const userData = userDoc.data();
+        if (userData.account_disabled) {
+          console.error(`User ${userId} is banned and cannot join the lobby.`);
+          return null;
+        }
+      } catch (error) {
+        console.error(`Error fetching user document for UID ${userId}:`, error);
+        return null;
+      }
 
       const lobbyDocRef = admin.firestore()
           .collection("lobby").doc(nextSaturday)
