@@ -56,14 +56,7 @@ function formatPhoneNumber(phoneNumber) {
 }
 
 async function sendTextReminder(formattedPhoneNumber) {
-  const message = `Hi there!
-
-  Thank you for being an awesome part of Mesh! Your feedback is incredibly valuable to us as we continue to grow and improve. If you could spare just 1-3 minutes to share your thoughts, it would mean the world to us. 
-  
-  Click here to start the survey: https://q38b2a3usyo.typeform.com/to/UXqnosSt
-  
-  Thanks a million!
-  The Mesh Team`;
+  const message = "Thank you for being part of Mesh! If you'd like to, rate your group comptaibility to improve your own personalized algorithm: mesh://meshapp.us/followUpConnections";
 
 
   try {
