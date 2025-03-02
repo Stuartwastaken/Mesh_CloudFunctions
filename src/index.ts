@@ -26,5 +26,6 @@ export * from "./controllers/countPausedUsers";
 export * from "./controllers/generateReferralLink";
 export * from "./controllers/migrate";
 export * from "./controllers/revenueCatWebhook";
+export * from "./controllers/sendFeedbackRequestsDormantUsers";
 // export * from "./controllers/sendNotifications";
 
