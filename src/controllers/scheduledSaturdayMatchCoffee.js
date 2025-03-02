@@ -31,17 +31,24 @@ function createScheduledSaturdayMatchCoffee(timeZone) {
         console.log(`Processing complete for all locations in ${timeZone}.`);
         return null;
       } catch (error) {
-        console.error(`Error during function execution for ${timeZone}: `, error);
+        console.error(
+          `Error during function execution for ${timeZone}: `,
+          error
+        );
         return null;
       }
     });
 }
 
 // Export scheduled functions for different time zones
-exports.scheduledSaturdayMatchCoffeeEastern = createScheduledSaturdayMatchCoffee("America/New_York");
-exports.scheduledSaturdayMatchCoffeeCentral = createScheduledSaturdayMatchCoffee("America/Chicago");
-exports.scheduledSaturdayMatchCoffeeMountain = createScheduledSaturdayMatchCoffee("America/Denver");
-exports.scheduledSaturdayMatchCoffeePacific = createScheduledSaturdayMatchCoffee("America/Los_Angeles");
+exports.scheduledSaturdayMatchCoffeeEastern =
+  createScheduledSaturdayMatchCoffee("America/New_York");
+exports.scheduledSaturdayMatchCoffeeCentral =
+  createScheduledSaturdayMatchCoffee("America/Chicago");
+exports.scheduledSaturdayMatchCoffeeMountain =
+  createScheduledSaturdayMatchCoffee("America/Denver");
+exports.scheduledSaturdayMatchCoffeePacific =
+  createScheduledSaturdayMatchCoffee("America/Los_Angeles");
 
 // Helper function to get the next Saturday
 function getNextSaturday() {
@@ -78,8 +85,11 @@ function shuffleArray(array) {
 // Calculate standard deviation of years for sorting noise
 function calculateStandardDeviation(people) {
   if (people.length === 0) return 0;
-  const mean = people.reduce((acc, person) => acc + person.year, 0) / people.length;
-  const variance = people.reduce((acc, person) => acc + Math.pow(person.year - mean, 2), 0) / people.length;
+  const mean =
+    people.reduce((acc, person) => acc + person.year, 0) / people.length;
+  const variance =
+    people.reduce((acc, person) => acc + Math.pow(person.year - mean, 2), 0) /
+    people.length;
   const stdDev = Math.sqrt(variance);
   return Math.min(stdDev, 5);
 }
@@ -96,9 +106,9 @@ function sortByYearWithNoise(stdDev) {
 }
 function mergeGroupsTo5(groups) {
   // Separate groups into those with 2 members, 3 members, and others
-  const groupsOf2 = groups.filter(g => g.length === 2);
-  const groupsOf3 = groups.filter(g => g.length === 3);
-  const otherGroups = groups.filter(g => g.length !== 2 && g.length !== 3);
+  const groupsOf2 = groups.filter((g) => g.length === 2);
+  const groupsOf3 = groups.filter((g) => g.length === 3);
+  const otherGroups = groups.filter((g) => g.length !== 2 && g.length !== 3);
   const mergedGroups = [];
 
   // Merge groups of 2 and 3 into groups of 5 while pairs exist
@@ -134,8 +144,13 @@ function validateGroups(groups) {
 
     const maleCount = group.filter((p) => p.gender === "M").length;
     const femaleCount = group.filter((p) => p.gender === "F").length;
-    if ((maleCount === 3 && femaleCount === 1) || (femaleCount === 3 && maleCount === 1)) {
-      console.error(`Validation Failed: Gender imbalance - Males: ${maleCount}, Females: ${femaleCount}`);
+    if (
+      (maleCount === 3 && femaleCount === 1) ||
+      (femaleCount === 3 && maleCount === 1)
+    ) {
+      console.error(
+        `Validation Failed: Gender imbalance - Males: ${maleCount}, Females: ${femaleCount}`
+      );
       validationPassed = false;
     }
   }
@@ -158,7 +173,10 @@ function adjustGenderBalance(groups) {
       if (prevFemales.length >= 3) {
         const femaleIdx = groups[i - 1].findIndex((p) => p.gender === "F");
         const maleIdx = groups[i].findIndex((p) => p.gender === "M");
-        [groups[i - 1][femaleIdx], groups[i][maleIdx]] = [groups[i][maleIdx], groups[i - 1][femaleIdx]];
+        [groups[i - 1][femaleIdx], groups[i][maleIdx]] = [
+          groups[i][maleIdx],
+          groups[i - 1][femaleIdx],
+        ];
       }
     }
   }
@@ -185,7 +203,9 @@ function separateBlockedUsers(groups) {
     for (let i = 0; i < groups.length; i++) {
       for (let j = 0; j < groups[i].length; j++) {
         const person = groups[i][j];
-        const blockedIdx = groups[i].findIndex((m) => person.blockedUsers.has(m.uid));
+        const blockedIdx = groups[i].findIndex((m) =>
+          person.blockedUsers.has(m.uid)
+        );
         if (blockedIdx !== -1 && blockedIdx !== j) {
           conflictFound = true;
           let swapped = false;
@@ -279,7 +299,10 @@ async function getPeopleFromFirestore(city) {
       continue;
     }
 
-    const locationPath = typeof data.location === "object" && data.location.path ? data.location.path : data.location;
+    const locationPath =
+      typeof data.location === "object" && data.location.path
+        ? data.location.path
+        : data.location;
 
     if (!peopleByLocation[locationPath]) {
       peopleByLocation[locationPath] = [];
@@ -347,7 +370,9 @@ async function processLocations(city) {
             date: nextSaturday,
             timestamp: Timestamp.fromDate(new Date()),
           });
-          console.log(`Logged ${person.name} (UID: ${person.uid}) to not_paired_tempbin`);
+          console.log(
+            `Logged ${person.name} (UID: ${person.uid}) to not_paired_tempbin`
+          );
         }
       }
 
@@ -367,7 +392,9 @@ async function saveGroupsToFirestore(groups, city, location) {
   for (const group of groups) {
     // Safeguard: skip groups with fewer than 2 members
     if (group.length < 2) {
-      console.warn(`Skipping group with less than 2 members: ${group.map((p) => p.uid)}`);
+      console.warn(
+        `Skipping group with less than 2 members: ${group.map((p) => p.uid)}`
+      );
       continue;
     }
 
@@ -423,6 +450,9 @@ async function deleteDocuments(city, location, people) {
   const db = admin.firestore();
   const nextSaturday = formatDate(getNextSaturday());
   for (const person of people) {
-    await db.collection(`lobby/${nextSaturday}/${city}`).doc(person.uid).delete();
+    await db
+      .collection(`lobby/${nextSaturday}/${city}`)
+      .doc(person.uid)
+      .delete();
   }
 }
