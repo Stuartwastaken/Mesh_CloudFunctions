@@ -2,7 +2,11 @@ const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
 const {Timestamp} = admin.firestore;
+const {notifyUser} = require("./sendNotifications");
 
+admin.initializeApp(); // Ensure Firestore is initialized
+
+// Function to get active cities for a given timezone
 async function getActiveCitiesForTimeZone(timeZone) {
   const cityConfigsSnapshot = await admin
       .firestore()
@@ -14,9 +18,10 @@ async function getActiveCitiesForTimeZone(timeZone) {
   return cityConfigsSnapshot.docs.map((doc) => doc.id);
 }
 
+// Create scheduled function for Saturday matching
 function createScheduledSaturdayMatchCoffee(timeZone) {
   return functions.pubsub
-      .schedule("0 8 * * 6")
+      .schedule("0 8 * * 6") // Runs every Saturday at 8:00 AM
       .timeZone(timeZone)
       .onRun(async (context) => {
         try {
@@ -24,7 +29,6 @@ function createScheduledSaturdayMatchCoffee(timeZone) {
           for (const city of cities) {
             await processLocations(city);
           }
-
           console.log(`Processing complete for all locations in ${timeZone}.`);
           return null;
         } catch (error) {
@@ -37,6 +41,7 @@ function createScheduledSaturdayMatchCoffee(timeZone) {
       });
 }
 
+// Export scheduled functions for different time zones
 exports.scheduledSaturdayMatchCoffeeEastern =
   createScheduledSaturdayMatchCoffee("America/New_York");
 exports.scheduledSaturdayMatchCoffeeCentral =
@@ -58,17 +63,19 @@ function getNextSaturday() {
   }
 }
 
-// Helper function to format the date
+// Helper function to format the date as MM_DD_YYYY
 function formatDate(date) {
   return `${date.getMonth() + 1}_${date.getDate()}_${date.getFullYear()}`;
 }
 
+// Generate a random 10-digit number for group chat IDs
 function generateRandom10DigitNumber() {
   const min = 1000000000;
   const max = 9999999999;
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
+// Shuffle an array in place
 function shuffleArray(array) {
   for (let i = array.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -76,6 +83,7 @@ function shuffleArray(array) {
   }
 }
 
+// Calculate standard deviation of years for sorting noise
 function calculateStandardDeviation(people) {
   if (people.length === 0) return 0;
   const mean =
@@ -87,6 +95,7 @@ function calculateStandardDeviation(people) {
   return Math.min(stdDev, 5);
 }
 
+// Sorting function with noise based on year
 function sortByYearWithNoise(stdDev) {
   return function(a, b) {
     const noiseA = (Math.random() * 2 - 1) * stdDev;
@@ -96,118 +105,98 @@ function sortByYearWithNoise(stdDev) {
     return yearA - yearB;
   };
 }
+function mergeGroupsTo5(groups) {
+  // Separate groups into those with 2 members, 3 members, and others
+  const groupsOf2 = groups.filter((g) => g.length === 2);
+  const groupsOf3 = groups.filter((g) => g.length === 3);
+  const otherGroups = groups.filter((g) => g.length !== 2 && g.length !== 3);
+  const mergedGroups = [];
 
-function isFriend(name) {
-  return name.includes("(friend)");
+  // Merge groups of 2 and 3 into groups of 5 while pairs exist
+  while (groupsOf2.length > 0 && groupsOf3.length > 0) {
+    const group2 = groupsOf2.pop(); // Take one group of 2
+    const group3 = groupsOf3.pop(); // Take one group of 3
+    const mergedGroup = [...group2, ...group3]; // Combine into group of 5
+    mergedGroups.push(mergedGroup);
+  }
+
+  // Reconstruct the groups list in place
+  groups.length = 0; // Clear the original array
+  groups.push(...otherGroups, ...mergedGroups, ...groupsOf2, ...groupsOf3);
 }
 
+// Validate groups for blocked users and gender balance
 function validateGroups(groups) {
   let validationPassed = true;
-
   console.log("Running Validation Checks...");
-
-  // Flatten groups to track all unique users
   const allUsers = new Set(groups.flat().map((p) => p.uid));
 
-  // Check for blocked users in the same group
-  for (let i = 0; i < groups.length; i++) {
-    const group = groups[i];
-
-    for (let j = 0; j < group.length; j++) {
-      const person = group[j];
-
-      for (let k = 0; k < group.length; k++) {
-        if (j !== k && person.blockedUsers.has(group[k].uid)) {
-          console.error(`Validation Failed: Blocked users in the same group! 
-            ${person.name} (UID: ${person.uid}) is in the same group as 
-            ${group[k].name} (UID: ${group[k].uid})`);
+  for (const group of groups) {
+    for (const person of group) {
+      for (const member of group) {
+        if (person !== member && person.blockedUsers.has(member.uid)) {
+          console.error(
+              `Validation Failed: Blocked users in group! ${person.name} (UID: ${person.uid}) with ${member.name} (UID: ${member.uid})`
+          );
           validationPassed = false;
         }
       }
     }
-  }
-
-  console.log("Blocked user validation completed.");
-
-  // Check for gender balance
-  for (let i = 0; i < groups.length; i++) {
-    const group = groups[i];
 
     const maleCount = group.filter((p) => p.gender === "M").length;
     const femaleCount = group.filter((p) => p.gender === "F").length;
-
     if (
       (maleCount === 3 && femaleCount === 1) ||
       (femaleCount === 3 && maleCount === 1)
     ) {
-      console.error(`Validation Failed: Gender imbalance in Group ${i + 1}
-        Males: ${maleCount}, Females: ${femaleCount}`);
+      console.error(
+          `Validation Failed: Gender imbalance - Males: ${maleCount}, Females: ${femaleCount}`
+      );
       validationPassed = false;
     }
   }
 
-  console.log("Gender balance validation completed.");
-
-  // Final validation summary
   if (validationPassed) {
-    console.log("All validation checks passed! Groups are correctly formed.");
+    console.log("All validation checks passed!");
   } else {
-    console.warn(
-        "Some validation checks failed. Please review the errors above."
-    );
+    console.warn("Some validation checks failed.");
   }
 }
 
+// Adjust gender balance by swapping members
 function adjustGenderBalance(groups) {
   for (let i = 0; i < groups.length; i++) {
     const maleCount = groups[i].filter((p) => p.gender === "M").length;
     const femaleCount = groups[i].filter((p) => p.gender === "F").length;
 
-    if (maleCount === 3 && femaleCount === 1) {
-      if (i > 0 && groups[i - 1].filter((p) => p.gender === "F").length >= 3) {
-        const femaleToSwap = groups[i - 1].findIndex((p) => p.gender === "F");
-        const maleToSwap = groups[i].findIndex((p) => p.gender === "M");
-        [groups[i - 1][femaleToSwap], groups[i][maleToSwap]] = [
-          groups[i][maleToSwap],
-          groups[i - 1][femaleToSwap],
-        ];
-      } else if (
-        i < groups.length - 1 &&
-        groups[i + 1].filter((p) => p.gender === "F").length >= 3
-      ) {
-        const femaleToSwap = groups[i + 1].findIndex((p) => p.gender === "F");
-        const maleToSwap = groups[i].findIndex((p) => p.gender === "M");
-        [groups[i + 1][femaleToSwap], groups[i][maleToSwap]] = [
-          groups[i][maleToSwap],
-          groups[i + 1][femaleToSwap],
+    if (maleCount === 3 && femaleCount === 1 && i > 0) {
+      const prevFemales = groups[i - 1].filter((p) => p.gender === "F");
+      if (prevFemales.length >= 3) {
+        const femaleIdx = groups[i - 1].findIndex((p) => p.gender === "F");
+        const maleIdx = groups[i].findIndex((p) => p.gender === "M");
+        [groups[i - 1][femaleIdx], groups[i][maleIdx]] = [
+          groups[i][maleIdx],
+          groups[i - 1][femaleIdx],
         ];
       }
     }
   }
 }
 
+// Redistribute members to ensure minimum group size
 function waterfall(groups) {
   for (let i = groups.length - 1; i > 0; i--) {
-    while (groups[i].length < 3) {
-      const needed = 3 - groups[i].length;
-      const donorGroup = groups[i - 1];
-      if (donorGroup.length > needed) {
-        const membersToMove = donorGroup.splice(
-            donorGroup.length - needed,
-            needed
-        );
-        groups[i] = membersToMove.concat(groups[i]);
-      } else {
-        break;
-      }
+    while (groups[i].length < 3 && groups[i - 1].length > 3) {
+      const member = groups[i - 1].pop();
+      groups[i].unshift(member);
     }
   }
 }
 
+// Separate blocked users by swapping
 function separateBlockedUsers(groups) {
   const maxAttempts = 5;
   let attempt = 0;
-  const unresolvedUsers = new Set(); // Track users who couldn't be placed correctly
 
   while (attempt < maxAttempts) {
     let conflictFound = false;
@@ -215,50 +204,27 @@ function separateBlockedUsers(groups) {
     for (let i = 0; i < groups.length; i++) {
       for (let j = 0; j < groups[i].length; j++) {
         const person = groups[i][j];
-
-        if (unresolvedUsers.has(person.uid)) continue; // Skip already flagged users
-
-        // Check if this person is in a group with someone they blocked
-        const blockedIndex = groups[i].findIndex((member) =>
-          person.blockedUsers.has(member.uid)
+        const blockedIdx = groups[i].findIndex((m) =>
+          person.blockedUsers.has(m.uid)
         );
-
-        if (blockedIndex !== -1) {
+        if (blockedIdx !== -1 && blockedIdx !== j) {
           conflictFound = true;
           let swapped = false;
 
-          // Step 1: Try swapping with a same-gender person from another group
-          for (let k = 0; k < groups.length; k++) {
+          for (let k = 0; k < groups.length && !swapped; k++) {
             if (k !== i) {
               for (let m = 0; m < groups[k].length; m++) {
-                const swapCandidate = groups[k][m];
-
+                const candidate = groups[k][m];
                 if (
-                  swapCandidate.gender === person.gender &&
-                  !groups[i].some((member) =>
-                    swapCandidate.blockedUsers.has(member.uid)
-                  )
+                  candidate.gender === person.gender &&
+                  !groups[i].some((m) => candidate.blockedUsers.has(m.uid))
                 ) {
-                  console.log(
-                      `Swapping ${person.name} (Group ${i + 1}) with ${
-                        swapCandidate.name
-                      } (Group ${k + 1})`
-                  );
                   [groups[i][j], groups[k][m]] = [groups[k][m], groups[i][j]];
                   swapped = true;
                   break;
                 }
               }
             }
-            if (swapped) break;
-          }
-
-          // Step 2: If no valid swap exists, mark them as unresolved
-          if (!swapped) {
-            unresolvedUsers.add(person.uid);
-            console.warn(
-                `Could not place ${person.name} (UID: ${person.uid}) in a valid group.`
-            );
           }
         }
       }
@@ -267,14 +233,9 @@ function separateBlockedUsers(groups) {
     if (!conflictFound) break;
     attempt++;
   }
-
-  if (unresolvedUsers.size > 0) {
-    console.warn(
-        `Final Unresolved Users: ${unresolvedUsers.size} could not be moved out of conflicts.`
-    );
-  }
 }
 
+// Group people into sets of up to 4
 function groupPeople(people) {
   const maxAttempts = 10;
   let attempt = 0;
@@ -285,38 +246,19 @@ function groupPeople(people) {
     shuffleArray(people);
     people.sort(sortFunction);
 
-    let totalEffectiveSize = 0;
-    people.forEach((person) => {
-      totalEffectiveSize += isFriend(person.name) ? 2 : 1;
-    });
-
     const groups = [];
     let currentGroup = [];
     let groupSize = 0;
-    let femaleCount = 0;
 
     for (const person of people) {
-      const effectiveSize = isFriend(person.name) ? 2 : 1;
+      const effectiveSize = 1;
       if (groupSize + effectiveSize > 4) {
         groups.push(currentGroup);
-        currentGroup = [];
-        groupSize = 0;
-        femaleCount = 0;
-      }
-
-      if (groupSize + effectiveSize <= 4) {
-        currentGroup.push(person);
-        groupSize += effectiveSize;
-        if (person.gender === "F") {
-          femaleCount++;
-        }
-      } else {
-        if (currentGroup.length > 0) {
-          groups.push(currentGroup);
-        }
         currentGroup = [person];
         groupSize = effectiveSize;
-        femaleCount = person.gender === "F" ? 1 : 0;
+      } else {
+        currentGroup.push(person);
+        groupSize += effectiveSize;
       }
     }
 
@@ -329,6 +271,7 @@ function groupPeople(people) {
       waterfall(groups);
       separateBlockedUsers(groups);
       validateGroups(groups);
+      mergeGroupsTo5(groups);
       return groups;
     }
 
@@ -338,6 +281,7 @@ function groupPeople(people) {
   return [];
 }
 
+// Fetch people from Firestore lobby
 async function getPeopleFromFirestore(city) {
   const db = admin.firestore();
   const nextSaturday = formatDate(getNextSaturday());
@@ -349,12 +293,10 @@ async function getPeopleFromFirestore(city) {
     const data = doc.data();
     const genderMap = {male: "M", female: "F", pna: "P"};
     const dateParts = data.age.split("/");
-    let year;
+    const year = dateParts.length === 3 ? parseInt(dateParts[2], 10) : null;
 
-    if (dateParts.length === 3 && !isNaN(parseInt(dateParts[2], 10))) {
-      year = parseInt(dateParts[2], 10);
-    } else {
-      console.error(`Incorrect date or format for ${data.name}: ${data.age}`);
+    if (!year) {
+      console.error(`Invalid date format for ${data.name}: ${data.age}`);
       continue;
     }
 
@@ -367,7 +309,6 @@ async function getPeopleFromFirestore(city) {
       peopleByLocation[locationPath] = [];
     }
 
-    // Fetch blocked users for the current user
     const blockedUsersSet = await getBlockedUsers(data.uid);
 
     peopleByLocation[locationPath].push({
@@ -376,37 +317,33 @@ async function getPeopleFromFirestore(city) {
       year,
       name: data.name,
       location: locationPath,
-      blockedUsers: blockedUsersSet, // Attach the blocked users set
+      blockedUsers: blockedUsersSet,
     });
   }
 
   return peopleByLocation;
 }
 
+// Fetch blocked users for a given UID
 async function getBlockedUsers(uid) {
   const db = admin.firestore();
   const blockedUsersSet = new Set();
 
-  try {
-    const blockedCollectionRef = db.collection(`users/${uid}/blocked`);
-    const blockedSnapshot = await blockedCollectionRef.get();
-
-    if (blockedSnapshot.empty) return blockedUsersSet; // Avoid unnecessary looping
-
-    blockedSnapshot.forEach((doc) => {
-      const blockedData = doc.data();
-      if (blockedData.uid) {
-        blockedUsersSet.add(blockedData.uid.split("/").pop()); // Extract just the UID
-      }
-    });
-  } catch (error) {
-    console.error(`Error fetching blocked users for UID: ${uid}`, error);
-  }
+  const blockedSnapshot = await db.collection(`users/${uid}/blocked`).get();
+  blockedSnapshot.forEach((doc) => {
+    const blockedData = doc.data();
+    if (blockedData.uid) {
+      blockedUsersSet.add(blockedData.uid.split("/").pop());
+    }
+  });
 
   return blockedUsersSet;
 }
 
+// Process locations and pair people
 async function processLocations(city) {
+  const db = admin.firestore();
+  const nextSaturday = formatDate(getNextSaturday());
   const peopleByLocation = await getPeopleFromFirestore(city);
 
   for (const location in peopleByLocation) {
@@ -415,12 +352,38 @@ async function processLocations(city) {
       const groups = groupPeople(people);
       console.log("Groups made: ", groups, "For location: ", location);
 
-      await saveGroupsToFirestore(groups, city, location);
-      await deleteDocuments(city, location, people);
+      // Filter groups: valid groups have 2 or more members
+      const validGroups = groups.filter((group) => group.length >= 2);
+      const tempbinPeople = groups.filter((group) => group.length < 2).flat();
+
+      // Save valid groups to Firestore
+      await saveGroupsToFirestore(validGroups, city, location);
+
+      // Log unpaired individuals to not_paired_tempbin
+      if (tempbinPeople.length > 0) {
+        const tempbinRef = db.collection("not_paired_tempbin");
+        for (const person of tempbinPeople) {
+          await tempbinRef.add({
+            uid: person.uid,
+            name: person.name,
+            location: location,
+            city: city,
+            date: nextSaturday,
+            timestamp: Timestamp.fromDate(new Date()),
+          });
+          console.log(
+              `Logged ${person.name} (UID: ${person.uid}) to not_paired_tempbin`
+          );
+        }
+      }
+
+      // Delete all people from the lobby after processing
+      await deleteDocuments(city, people);
     }
   }
 }
 
+// Save groups to Firestore and create chats
 async function saveGroupsToFirestore(groups, city, location) {
   const db = admin.firestore();
   const nextSaturday = formatDate(getNextSaturday());
@@ -428,6 +391,14 @@ async function saveGroupsToFirestore(groups, city, location) {
   let groupNumber = 1;
 
   for (const group of groups) {
+    // Safeguard: skip groups with fewer than 2 members
+    if (group.length < 2) {
+      console.warn(
+          `Skipping group with less than 2 members: ${group.map((p) => p.uid)}`
+      );
+      continue;
+    }
+
     const groupDocRef = db.collection(locationPath).doc();
     const groupDocId = groupDocRef.id;
     const locationRef = db.doc(location);
@@ -466,22 +437,23 @@ async function saveGroupsToFirestore(groups, city, location) {
           group_id: groupDocId,
           searching: false,
         });
-      } else {
-        console.log(
-            `No document found for UID: ${member.uid}, skipping update.`
-        );
+
+        // Notify the user about their pairing
+        await notifyUser(member.uid, {
+          title: "You've been paired!",
+          body: "Your coffee group is ready. Check your matches to meet your group!",
+        });
       }
     }
 
     const queryGroupedDocRef = db.collection("grouped").doc(groupDocId);
     await queryGroupedDocRef.set(groupDoc);
-    console.log(
-        `Group saved in ${locationPath} and in the global 'grouped' collection with ID ${groupDocId}`
-    );
+    console.log(`Group saved with ID ${groupDocId}`);
   }
 }
 
-async function deleteDocuments(city, location, people) {
+// Delete people from the lobby
+async function deleteDocuments(city, people) {
   const db = admin.firestore();
   const nextSaturday = formatDate(getNextSaturday());
   for (const person of people) {
