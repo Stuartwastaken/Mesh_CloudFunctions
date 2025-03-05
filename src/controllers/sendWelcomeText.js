@@ -33,15 +33,11 @@ exports.sendWelcomeText = functions.firestore
         if (totalUsers >= 500) {
           const messageBody = `Hey ${display_name}, welcome to Mesh! 
         
-          ${city_map[current_city]} is alive with ${
-  totalUsers + 1
-} members. Every Saturday at 10am, we match small groups at local coffee shops to connect and unwind – invites are free, you just pay when you join in. Excited you’re here! – Stuart & Michael, Mesh Co-founders`;
+          ${city_map[current_city]} is alive with ${totalUsers + 1} members. Every Saturday at 10am, we match small groups at local coffee shops to connect and unwind – invites are free, you just pay when you join in. Excited you’re here! – Stuart & Michael, Mesh Co-founders`;
         } else {
           const messageBody = `Hey ${display_name}, welcome to Mesh! 
         
-          You’re #${totalUsers + 1} of 500 in ${
-  city_map[current_city]
-}. We’re brewing something special, and once we hit 500, you’ll get invites to our Saturday coffee meetups. Hang tight – we’ll be in touch! – Stuart & Michael, Mesh Co-founders`;
+          You’re #${totalUsers + 1} of 500 in ${city_map[current_city]}. We’re brewing something special, and once we hit 500, you’ll get invites to our Saturday coffee meetups. Hang tight – we’ll be in touch! – Stuart & Michael, Mesh Co-founders`;
         }
 
         // Increment totalUsers

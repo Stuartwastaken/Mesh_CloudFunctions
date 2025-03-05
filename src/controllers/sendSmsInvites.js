@@ -51,7 +51,7 @@ async function processUserChunks(userIds, start, locationId, CHUNK_SIZE) {
       }
 
       const formattedPhoneNumber = formatPhoneNumber(rawPhoneNumber);
-      const textMessage = `Hey ${displayName}, your Saturday coffee meetup is here! Open the app to accept or decline your spot.`;
+      const textMessage = `Hi ${displayName}, we'd love to have you for coffee this Saturday at 10 am. Click here to accept or decline`;
       const linkMessage =
         deviceType === "IOS" ?
           "mesh://meshapp.us/invitedConfirm" :
