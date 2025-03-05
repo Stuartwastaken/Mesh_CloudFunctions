@@ -9,11 +9,11 @@ admin.initializeApp(); // Ensure Firestore is initialized
 // Function to get active cities for a given timezone
 async function getActiveCitiesForTimeZone(timeZone) {
   const cityConfigsSnapshot = await admin
-      .firestore()
-      .collection("city_config")
-      .where("isActive", "==", true)
-      .where("timeZone", "==", timeZone)
-      .get();
+    .firestore()
+    .collection("city_config")
+    .where("isActive", "==", true)
+    .where("timeZone", "==", timeZone)
+    .get();
 
   return cityConfigsSnapshot.docs.map((doc) => doc.id);
 }
@@ -38,7 +38,16 @@ function createScheduledSaturdayMatchCoffee(timeZone) {
           );
           return null;
         }
-      });
+        console.log(`Processing complete for all locations in ${timeZone}.`);
+        return null;
+      } catch (error) {
+        console.error(
+          `Error during function execution for ${timeZone}: `,
+          error
+        );
+        return null;
+      }
+    });
 }
 
 // Export scheduled functions for different time zones
@@ -97,7 +106,7 @@ function calculateStandardDeviation(people) {
 
 // Sorting function with noise based on year
 function sortByYearWithNoise(stdDev) {
-  return function(a, b) {
+  return function (a, b) {
     const noiseA = (Math.random() * 2 - 1) * stdDev;
     const noiseB = (Math.random() * 2 - 1) * stdDev;
     const yearA = a.year + noiseA;
@@ -291,7 +300,7 @@ async function getPeopleFromFirestore(city) {
 
   for (const doc of snapshot.docs) {
     const data = doc.data();
-    const genderMap = {male: "M", female: "F", pna: "P"};
+    const genderMap = { male: "M", female: "F", pna: "P" };
     const dateParts = data.age.split("/");
     const year = dateParts.length === 3 ? parseInt(dateParts[2], 10) : null;
 
@@ -301,9 +310,9 @@ async function getPeopleFromFirestore(city) {
     }
 
     const locationPath =
-      typeof data.location === "object" && data.location.path ?
-        data.location.path :
-        data.location;
+      typeof data.location === "object" && data.location.path
+        ? data.location.path
+        : data.location;
 
     if (!peopleByLocation[locationPath]) {
       peopleByLocation[locationPath] = [];
@@ -458,8 +467,8 @@ async function deleteDocuments(city, people) {
   const nextSaturday = formatDate(getNextSaturday());
   for (const person of people) {
     await db
-        .collection(`lobby/${nextSaturday}/${city}`)
-        .doc(person.uid)
-        .delete();
+      .collection(`lobby/${nextSaturday}/${city}`)
+      .doc(person.uid)
+      .delete();
   }
 }
