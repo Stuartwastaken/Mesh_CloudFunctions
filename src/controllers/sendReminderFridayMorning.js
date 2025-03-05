@@ -18,7 +18,7 @@ const client = new Twilio(accountSid, authToken);
  */
 exports.sendMeshInvites = functions.pubsub
     .schedule("0 10 * * FRI")
-    .timeZone("America/New_York") // adjust time zone as needed
+    .timeZone("America/Chicago")
     .onRun(async (context) => {
       const db = admin.firestore();
       const invitesSnapshot = await db.collection("join_lobby_tempbin").get();
