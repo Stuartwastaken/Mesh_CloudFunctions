@@ -18,7 +18,6 @@ exports.sendWelcomeText = functions.firestore
       const {uid, phone_number, current_city, display_name} = newUser;
 
       try {
-        // Get city config document
         const cityConfigRef = db.collection("city_config").doc(current_city);
         const cityConfigDoc = await cityConfigRef.get();
 
@@ -30,18 +29,23 @@ exports.sendWelcomeText = functions.firestore
         const cityConfig = cityConfigDoc.data();
         const totalUsers = cityConfig.totalUsers || 0;
 
+        let messageBody;
         if (totalUsers >= 500) {
-          console.log(`${current_city} has already reached 500 users. No welcome text sent.`); // no welcome message at all if the city is already active?
-          return;
+          const messageBody = `Hey ${display_name}, welcome to Mesh! 
+        
+          ${city_map[current_city]} is alive with ${
+  totalUsers + 1
+} members. Every Saturday at 10am, we match small groups at local coffee shops to connect and unwind – invites are free, you just pay when you join in. Excited you’re here! – Stuart & Michael, Mesh Co-founders`;
+        } else {
+          const messageBody = `Hey ${display_name}, welcome to Mesh! 
+        
+          You’re #${totalUsers + 1} of 500 in ${
+  city_map[current_city]
+}. We’re brewing something special, and once we hit 500, you’ll get invites to our Saturday coffee meetups. Hang tight – we’ll be in touch! – Stuart & Michael, Mesh Co-founders`;
         }
 
         // Increment totalUsers
         await cityConfigRef.update({totalUsers: totalUsers + 1});
-
-        const messageBody = `Hey ${display_name}, welcome to the Mesh community! You’re #${totalUsers + 1}/500 in ${city_map[current_city]}.
-        
-        We invite you to local coffee shops with 3–4 others on Saturdays at 10am, invites go out on Wednesdays. As soon as ${city_map[current_city]} is close to 500 signups, we’ll start those invites. In the meantime, feel free to explore the app and use your referral link (found in your profile) to help reach that goal faster. Cheers, Stuart and Michael (Mesh co-founders).`;
-        // tried to shorten up the message, while keeping key information
 
         const formattedPhoneNumber = formatPhoneNumber(phone_number);
         // Send text message
@@ -51,7 +55,9 @@ exports.sendWelcomeText = functions.firestore
           to: formattedPhoneNumber,
         });
 
-        console.log(`Welcome text sent to ${display_name} (${phone_number}) in ${current_city}`);
+        console.log(
+            `Welcome text sent to ${display_name} (${phone_number}) in ${current_city}`
+        );
 
         // Delete the document from the tempbin
         await snap.ref.delete();

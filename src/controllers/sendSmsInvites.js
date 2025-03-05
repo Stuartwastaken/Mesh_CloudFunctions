@@ -43,7 +43,7 @@ async function processUserChunks(userIds, start, locationId, CHUNK_SIZE) {
       const user = userDoc.data();
       const rawPhoneNumber = user.phone_number;
       const displayName = user.display_name || "there"; // Fallback to "there" if no display name is available
-      const verified = user.verified || false;
+      const deviceType = user.device_type || false;
 
       if (!rawPhoneNumber) {
         console.warn(`Phone number not found for user ${userId}`);
@@ -51,10 +51,11 @@ async function processUserChunks(userIds, start, locationId, CHUNK_SIZE) {
       }
 
       const formattedPhoneNumber = formatPhoneNumber(rawPhoneNumber);
-      const textMessage = verified ?
-        `Hi ${displayName}, It’s time for this week’s location reveal! Pick your location in the app!` :
-        `Hi ${displayName}, It’s time for this week’s location reveal! Open the app to accept or decline.`;
-      const linkMessage = "mesh://meshapp.us/invitedConfirm";
+      const textMessage = `Hey ${displayName}, your Saturday coffee meetup is here! Open the app to accept or decline your spot.`;
+      const linkMessage =
+        deviceType === "IOS" ?
+          "mesh://meshapp.us/invitedConfirm" :
+          `https://nextjs-mesh-seven.vercel.app/?location=${locationId}&route=invitedConfirm`;
 
       console.log("Sending to: ", formattedPhoneNumber);
       await sendTextInvite(formattedPhoneNumber, textMessage, linkMessage);
