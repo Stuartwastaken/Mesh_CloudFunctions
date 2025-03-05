@@ -38,16 +38,7 @@ function createScheduledSaturdayMatchCoffee(timeZone) {
           );
           return null;
         }
-        console.log(`Processing complete for all locations in ${timeZone}.`);
-        return null;
-      } catch (error) {
-        console.error(
-          `Error during function execution for ${timeZone}: `,
-          error
-        );
-        return null;
-      }
-    });
+      });
 }
 
 // Export scheduled functions for different time zones
