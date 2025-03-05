@@ -8,9 +8,9 @@ const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 const client = new Twilio(accountSid, authToken);
 
-exports.sendSmsInvites = functions.runWith({timeoutSeconds: 540})
-    .firestore
-    .document("send_sms_invites_tempbin/{docId}")
+exports.sendSmsInvites = functions
+    .runWith({timeoutSeconds: 540})
+    .firestore.document("send_sms_invites_tempbin/{docId}")
     .onCreate(async (snap, context) => {
       const data = snap.data();
       const {locationId, userIds} = data;
@@ -31,7 +31,11 @@ async function processUserChunks(userIds, start, locationId, CHUNK_SIZE) {
   const chunk = userIds.slice(start, start + CHUNK_SIZE);
   for (const userId of chunk) {
     try {
-      const userDoc = await admin.firestore().collection("users").doc(userId).get();
+      const userDoc = await admin
+          .firestore()
+          .collection("users")
+          .doc(userId)
+          .get();
       if (!userDoc.exists) {
         console.warn(`User ${userId} not found`);
         continue;
@@ -39,6 +43,7 @@ async function processUserChunks(userIds, start, locationId, CHUNK_SIZE) {
       const user = userDoc.data();
       const rawPhoneNumber = user.phone_number;
       const displayName = user.display_name || "there"; // Fallback to "there" if no display name is available
+      const verified = user.verified || false;
 
       if (!rawPhoneNumber) {
         console.warn(`Phone number not found for user ${userId}`);
@@ -46,7 +51,9 @@ async function processUserChunks(userIds, start, locationId, CHUNK_SIZE) {
       }
 
       const formattedPhoneNumber = formatPhoneNumber(rawPhoneNumber);
-      const textMessage = `Hi ${displayName}, we'd love to have you for coffee this Saturday at 10 am.`;
+      const textMessage = verified ?
+        `Hi ${displayName}, It’s time for this week’s location reveal! Pick your location in the app!` :
+        `Hi ${displayName}, It’s time for this week’s location reveal! Open the app to accept or decline.`;
       const linkMessage = "mesh://meshapp.us/invitedConfirm";
 
       console.log("Sending to: ", formattedPhoneNumber);
