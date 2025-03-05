@@ -1,139 +1,148 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
-const twilio = require("twilio");
-require("dotenv").config();
 
 const db = admin.firestore();
 
-// Load Twilio credentials from environment variables
-const accountSid = process.env.TWILIO_ACCOUNT_SID;
-const authToken = process.env.TWILIO_AUTH_TOKEN;
-const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
-const client = twilio(accountSid, authToken);
+/**
+ * Sends a notification to a user via their FCM tokens.
+ * @param {string} userId - The ID of the user to notify.
+ * @param {Object} messageObj - The notification message with title and body.
+ */
+async function notifyUser(userId, messageObj) {
+  const fcmTokensSnapshot = await admin
+      .firestore()
+      .collection("users")
+      .doc(userId)
+      .collection("fcm_tokens")
+      .get();
 
-const CHUNK_SIZE = 10; // Number of messages to send in each invocation
+  if (fcmTokensSnapshot.empty) {
+    console.log(`[WARNING] No FCM tokens found for user ${userId}`);
+    return;
+  }
 
-// Function to get the next Saturday
-function getNextSaturday() {
-  const today = new Date();
-  return new Date(today.setDate(today.getDate() + ((6 - today.getDay() + 7) % 7)));
+  for (const doc of fcmTokensSnapshot.docs) {
+    const fcmTokenData = doc.data();
+    if (fcmTokenData && fcmTokenData.fcm_token) {
+      const payload = {
+        notification: {
+          title: messageObj.title,
+          body: messageObj.body,
+        },
+        token: fcmTokenData.fcm_token,
+      };
+
+      try {
+        await admin.messaging().send(payload);
+        console.log(`[SUCCESS] Notification sent to user ${userId}`);
+      } catch (error) {
+        console.error(
+            `[ERROR] Failed to send notification to ${userId}:`,
+            error.message
+        );
+      }
+    }
+  }
 }
 
-// Function to format the date as "M_D_YYYY" and "MM_DD_YYYY"
-function formatDates(date) {
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  return [
-    `${month}_${day}_${year}`,
-    `${String(month).padStart(2, "0")}_${String(day).padStart(2, "0")}_${year}`,
-  ];
-}
-
-exports.remindLobby = functions
-    .runWith({timeoutSeconds: 540})
-    .firestore.document("remind_lobby_tempbin/{docId}")
+/**
+ * Cloud Function triggered when a document is created in 'remind_lobby_tempbin'.
+ * Sends notifications to users with the 'name' from their 'location' document.
+ */
+exports.remindLobby = functions.firestore
+    .document("remind_lobby_tempbin/{docId}")
     .onCreate(async (snap, context) => {
+    // Extract the city from the newly created document
       const reminderData = snap.data();
       const city = reminderData.city;
-      const timeZone = reminderData.timeZone;
 
-      console.log(`[START] Processing reminders for ${city} in ${timeZone}`);
-
-      const nextSaturday = getNextSaturday();
-      const [dateFormat1, dateFormat2] = formatDates(nextSaturday);
-      console.log(`Next Saturday formats: ${dateFormat1} and ${dateFormat2}`);
-
-      let subcollectionRef;
-      let snapshot;
-
-      // Try both date formats
-      for (const dateFormat of [dateFormat1, dateFormat2]) {
-        subcollectionRef = db.collection("lobby").doc(dateFormat).collection(city);
-        console.log(`Trying subcollection path: ${subcollectionRef.path}`);
-        snapshot = await subcollectionRef.get();
-        if (!snapshot.empty) {
-          console.log(`Found documents in ${subcollectionRef.path}`);
-          break;
-        }
-      }
-
-      if (!snapshot || snapshot.empty) {
-        console.log(`[WARNING] No documents found in subcollection for ${city}`);
+      if (!city) {
+        console.error(
+            "[ERROR] City field is missing in the remind_lobby_tempbin document"
+        );
         return;
       }
 
-      console.log(`Number of documents in snapshot: ${snapshot.size}`);
+      console.log(`[START] Processing notifications for city: ${city}`);
 
-      const docs = snapshot.docs;
-      await processChunks(docs, 0, city, timeZone);
-    });
+      // Step 1: Query users where 'current_city' matches the city
+      const usersSnapshot = await db
+          .collection("users")
+          .where("current_city", "==", city)
+          .where("searching", "==", true) // Added to filter users who are actively searching
+          .get();
 
-async function processChunks(docs, start, city, timeZone) {
-  console.log(`[CHUNK] Processing chunk starting at index ${start} for ${city}`);
-  const chunk = docs.slice(start, start + CHUNK_SIZE);
-  console.log(`Chunk size: ${chunk.length}`);
-
-  for (const doc of chunk) {
-    console.log(`[DOC] Processing document ${doc.id}`);
-    const userId = doc.get("uid");
-    if (userId) {
-      console.log(`User ID found: ${userId}`);
-      const userRef = db.collection("users").doc(userId);
-      const userDoc = await userRef.get();
-      if (userDoc.exists) {
-        console.log(`User document exists for ${userId}`);
-        const rawPhoneNumber = userDoc.get("phone_number");
-        if (rawPhoneNumber) {
-          const formattedPhoneNumber = formatPhoneNumber(rawPhoneNumber);
-          console.log(`Sending reminder to: ${formattedPhoneNumber} for ${city} in ${timeZone}`);
-          await sendTextReminder(formattedPhoneNumber, city);
-          await new Promise((resolve) => setTimeout(resolve, 20));
-        } else {
-          console.log(`[WARNING] No phone number found for user ${userId} in ${city}`);
-        }
-      } else {
-        console.log(`[ERROR] User document not found for ${userId} in ${city}`);
+      if (usersSnapshot.empty) {
+        console.log(`[WARNING] No users found with current_city ${city}`);
+        return;
       }
-    } else {
-      console.log(`[ERROR] No user ID found in lobby document ${doc.id} for ${city}`);
-    }
-  }
 
-  const nextStart = start + CHUNK_SIZE;
-  if (nextStart < docs.length) {
-    console.log(`[NEXT CHUNK] Proceeding to next chunk starting at index ${nextStart}`);
-    await processChunks(docs, nextStart, city, timeZone);
-  } else {
-    console.log(`[FINISH] Finished processing all reminders for ${city} in ${timeZone}`);
-  }
-}
+      console.log(`Number of users found: ${usersSnapshot.size}`);
 
-function formatPhoneNumber(phoneNumber) {
-  return phoneNumber.replace(/[^+\d]/g, "");
-}
+      // Step 2: Collect unique location references and map users to locations
+      const locationPathsSet = new Set(); // For unique location paths
+      const userLocationMap = {}; // Maps userId to their location path
 
-async function sendTextReminder(formattedPhoneNumber, city) {
-  const message =
-    `This is a reminder that you are all set to Mesh tomorrow morning in ${city}! ` +
-    "Please note that today you can cancel by opening the app and clicking the cancel button. " +
-    "We'd really appreciate it if you can't make it, to do that. " +
-    "We will then pair you into groups and you can see who you're grouped with on that same screen in the app by 8 am tomorrow morning! ";
+      for (const userDoc of usersSnapshot.docs) {
+        const userId = userDoc.id;
+        const locationRef = userDoc.get("location");
+        if (locationRef && locationRef.path) {
+          locationPathsSet.add(locationRef.path);
+          userLocationMap[userId] = locationRef.path;
+        } else {
+          console.log(`[WARNING] User ${userId} has no valid location reference`);
+        }
+      }
 
-  try {
-    const response = await client.messages.create({
-      body: message,
-      from: twilioPhoneNumber,
-      to: formattedPhoneNumber,
+      if (locationPathsSet.size === 0) {
+        console.log("[WARNING] No location references found for users");
+        return;
+      }
+
+      // Step 3: Convert unique location paths to DocumentReferences and fetch them
+      const uniqueLocationRefs = Array.from(locationPathsSet).map((path) =>
+        db.doc(path)
+      );
+      const locationDocs = await Promise.all(
+          uniqueLocationRefs.map((ref) => ref.get())
+      );
+
+      // Step 4: Create a map from location path to location name
+      const locationNameMap = {};
+      for (const locDoc of locationDocs) {
+        if (locDoc.exists) {
+          const name = locDoc.get("name");
+          if (name) {
+            locationNameMap[locDoc.ref.path] = name;
+          } else {
+            console.log(
+                `[WARNING] Location ${locDoc.ref.path} has no 'name' field`
+            );
+          }
+        } else {
+          console.log(
+              `[WARNING] Location document does not exist: ${locDoc.ref.path}`
+          );
+        }
+      }
+
+      // Step 5: Send notifications to each user with their location name
+      for (const userId in userLocationMap) {
+        if (Object.prototype.hasOwnProperty.call(userLocationMap, userId)) {
+          const locationPath = userLocationMap[userId];
+          const locationName = locationNameMap[locationPath];
+          if (locationName) {
+            const messageObj = {
+              title: "Mesh Reminder",
+              body: `You are all set to go out to ${locationName} this Friday!`,
+            };
+            await notifyUser(userId, messageObj);
+          } else {
+            console.log(
+                `[WARNING] No location name for user ${userId} at ${locationPath}`
+            );
+          }
+        }
+      }
+      console.log(`[FINISH] Finished processing notifications for city: ${city}`);
     });
-    console.log(`[SUCCESS] Message sent to ${formattedPhoneNumber}, SID: ${response.sid}`);
-  } catch (error) {
-    console.error(`[ERROR] Error sending text message to ${formattedPhoneNumber}:`, error);
-    console.error("[ERROR] Error details:", {
-      message: error.message,
-      response: error.response,
-      code: error.code,
-      errno: error.errno,
-    });
-  }
-}
