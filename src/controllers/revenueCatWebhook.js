@@ -25,7 +25,7 @@ exports.revenueCatWebhook = functions.https.onRequest(async (req, res) => {
 
     // Extracting necessary fields safely
     const event = req.body?.event;
-    const app_user_id = event?.app_user_id || req.body?.app_user_id;
+    let app_user_id = event?.app_user_id || req.body?.app_user_id;
     const entitlements = event?.entitlement_ids || req.body?.entitlements || {};
     const eventType = event?.type || req.body?.type;
     const expirationDate = event?.expiration_at_ms || null; // RevenueCat sends expiration timestamp
@@ -43,12 +43,17 @@ exports.revenueCatWebhook = functions.https.onRequest(async (req, res) => {
         message: "Missing or invalid app_user_id in RevenueCat webhook request",
         requestBody: req.body,
         extracted_app_user_id: app_user_id,
+        appUserIdLength: app_user_id ? app_user_id.length : "(undefined)",
+        trimmedAppUserIdLength: app_user_id ? app_user_id.trim().length : "(undefined)",
         timestamp: new Date().toISOString(),
       }));
       return res.status(400).send("Bad Request: Missing or invalid app_user_id");
     }
 
-    const userRef = db.collection("users").doc(app_user_id.trim());
+    // Trim the user ID to remove any trailing whitespace
+    app_user_id = app_user_id.trim();
+
+    const userRef = db.collection("users").doc(app_user_id);
     const userDoc = await userRef.get();
 
     if (!userDoc.exists) {
@@ -64,7 +69,9 @@ exports.revenueCatWebhook = functions.https.onRequest(async (req, res) => {
     const hasLifetimeEntitlement = userData?.has_lifetime_entitlement === true;
 
     // Determine if user should be verified
-    let isVerified = hasLifetimeEntitlement || (entitlements && Array.isArray(entitlements) && entitlements.length > 0);
+    let isVerified =
+      hasLifetimeEntitlement ||
+      (entitlements && Array.isArray(entitlements) && entitlements.length > 0);
 
     // If it's an EXPIRATION event or expiration timestamp is in the past, set verified to false
     if (eventType === "EXPIRATION" || (expirationDate && expirationDate < Date.now())) {
@@ -72,9 +79,10 @@ exports.revenueCatWebhook = functions.https.onRequest(async (req, res) => {
     }
 
     // Preserve super_group if already true, but set to false if premium expires
-    let newSuperGroup = userData.super_group;
+    let newSuperGroup =
+      typeof userData.super_group !== "undefined" ? userData.super_group : false;
     if (!isVerified) {
-      newSuperGroup = false; // Remove super_group if premium expires
+      newSuperGroup = false;
     }
 
     // Log structured data

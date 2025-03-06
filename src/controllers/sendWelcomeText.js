@@ -3,7 +3,6 @@ const admin = require("firebase-admin");
 const twilio = require("twilio");
 require("dotenv").config();
 
-
 const db = admin.firestore();
 
 // Load Twilio credentials from environment variables
@@ -19,7 +18,6 @@ exports.sendWelcomeText = functions.firestore
       const {uid, phone_number, current_city, display_name} = newUser;
 
       try {
-        // Get city config document
         const cityConfigRef = db.collection("city_config").doc(current_city);
         const cityConfigDoc = await cityConfigRef.get();
 
@@ -31,17 +29,19 @@ exports.sendWelcomeText = functions.firestore
         const cityConfig = cityConfigDoc.data();
         const totalUsers = cityConfig.totalUsers || 0;
 
+        let messageBody;
         if (totalUsers >= 500) {
-          console.log(`${current_city} has already reached 500 users. No welcome text sent.`);
-          return;
+          const messageBody = `Hey ${display_name}, welcome to Mesh! 
+        
+          ${city_map[current_city]} is alive with ${totalUsers + 1} members. Every Saturday at 10am, we match small groups at local coffee shops to connect and unwind – invites are free, you just pay when you join in. Excited you’re here! – Stuart & Michael, Mesh Co-founders`;
+        } else {
+          const messageBody = `Hey ${display_name}, welcome to Mesh! 
+        
+          You’re #${totalUsers + 1} of 500 in ${city_map[current_city]}. We’re brewing something special, and once we hit 500, you’ll get invites to our Saturday coffee meetups. Hang tight – we’ll be in touch! – Stuart & Michael, Mesh Co-founders`;
         }
 
         // Increment totalUsers
         await cityConfigRef.update({totalUsers: totalUsers + 1});
-
-        const messageBody = `Hey ${display_name}, welcome to the Mesh community! You’re #${totalUsers + 1}/500 in ${current_city}. We’ll start invites when ${current_city} hits 500.
-
-        We send you invites every Wednesday to local coffee shops Saturday at 10 am in groups of 3 or 4. If you'd like to help us get to 500 sign ups in your city, please share us on social media, and feel free to reach out to us for content ideas or collaborations! We’re accelerating the rate at which people can meet their crowd of people in any city. For now feel free to explore the app and invite your friends with a link found on your profile page! Cheers, Co-Founders, Stuart and Michael.`;
 
         const formattedPhoneNumber = formatPhoneNumber(phone_number);
         // Send text message
@@ -51,7 +51,9 @@ exports.sendWelcomeText = functions.firestore
           to: formattedPhoneNumber,
         });
 
-        console.log(`Welcome text sent to ${display_name} (${phone_number}) in ${current_city}`);
+        console.log(
+            `Welcome text sent to ${display_name} (${phone_number}) in ${current_city}`
+        );
 
         // Delete the document from the tempbin
         await snap.ref.delete();
@@ -63,3 +65,55 @@ exports.sendWelcomeText = functions.firestore
 function formatPhoneNumber(phoneNumber) {
   return phoneNumber.replace(/[^+\d]/g, "");
 }
+
+const city_map = {
+  albuquerque_nm: "Albuquerque, NM",
+  atlanta_ga: "Atlanta, GA",
+  austin_tx: "Austin, TX",
+  baltimore_md: "Baltimore, MD",
+  baton_rouge_la: "Baton Rouge, LA",
+  boise_id: "Boise, ID",
+  boston_ma: "Boston, MA",
+  charleston_sc: "Charleston, SC",
+  charlotte_nc: "Charlotte, NC",
+  chicago_il: "Chicago, IL",
+  cincinnati_oh: "Cincinnati, OH",
+  cleveland_oh: "Cleveland, OH",
+  dallas_tx: "Dallas, TX",
+  denver_co: "Denver, CO",
+  des_moines_ia: "Des Moines, IA",
+  detroit_mi: "Detroit, MI",
+  fort_myers_fl: "Fort Myers, FL",
+  honolulu_hi: "Honolulu, HI",
+  houston_tx: "Houston, TX",
+  indianapolis_in: "Indianapolis, IN",
+  kansas_city_mo: "Kansas City, MO",
+  las_vegas_nv: "Las Vegas, NV",
+  louisville_ky: "Louisville, KY",
+  madison_wi: "Madison, WI",
+  miami_fl: "Miami, FL",
+  milwaukee_wi: "Milwaukee, WI",
+  minneapolis_mn: "Minneapolis, MN",
+  nashville_tn: "Nashville, TN",
+  new_orleans_la: "New Orleans, LA",
+  new_york_ny: "New York, NY",
+  oklahoma_city_ok: "Oklahoma City, OK",
+  omaha_ne: "Omaha, NE",
+  other: "Other",
+  philadelphia_pa: "Philadelphia, PA",
+  phoenix_az: "Phoenix, AZ",
+  pittsburgh_pa: "Pittsburgh, PA",
+  portland_or: "Portland, OR",
+  raleigh_nc: "Raleigh, NC",
+  sacramento_ca: "Sacramento, CA",
+  saint_louis_mo: "Saint Louis, MO",
+  salt_lake_city_ut: "Salt Lake City, UT",
+  san_antonio_tx: "San Antonio, TX",
+  san_diego_ca: "San Diego, CA",
+  san_francisco_ca: "San Francisco, CA",
+  san_jose_ca: "San Jose, CA",
+  savannah_ga: "Savannah, GA",
+  seattle_wa: "Seattle, WA",
+  tampa_fl: "Tampa, FL",
+  washington_dc: "Washington, DC",
+};
