@@ -1,41 +1,120 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 
-export const reportUser = functions.firestore.
-    document("account_strikes_tempbin/{doc}")
+// Initialize Firebase Admin if not already initialized
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
+
+export const reportUser = functions.firestore
+    .document("account_strikes_tempbin/{doc}")
     .onCreate(async (snapshot, context) => {
-    // snapshot.data().authUid extracts from a documents field parameter
-    // for example here the snapshot is from the new document
-    // the documents .data().authUid is from the authUid field
-      const authUid = snapshot.data().authUid.id;
-      const otherUid = snapshot.data().otherUid.id;
-      const extremelyStrange: boolean = snapshot.data().extremely_strange;
-      const harassment: boolean = snapshot.data().harassment;
-      const quiteRude: boolean = snapshot.data().quite_rude;
-      console.log("AUTH USER: ", authUid);
-      console.log("OTHER USER: ", otherUid);
-      // check if the user is reporting themselves
-      if (authUid === otherUid) {
-        throw new functions.https
-            .HttpsError("unauthenticated", "You cannot report yourself.");
+    // Extract authUid and otherUid, ensuring they exist
+      const authUid = snapshot.data().authUid?.id;
+      const otherUid = snapshot.data().otherUid?.id;
+
+      // Log the start of the function with user info
+      functions.logger.log({
+        message: "Starting reportUser function",
+        authUid: authUid,
+        otherUid: otherUid,
+        docId: context.params.doc,
+      });
+
+      // Validate that both authUid and otherUid are present
+      if (!authUid || !otherUid) {
+        functions.logger.error({
+          message: "Missing authUid or otherUid in the report document",
+          authUid: authUid,
+          otherUid: otherUid,
+          docId: context.params.doc,
+        });
+        throw new functions.https.HttpsError(
+            "invalid-argument",
+            "Missing authUid or otherUid in the report document."
+        );
       }
 
-      // Query otherUid's "account_strikes" collection
-      // for a document of title strikes
-      const otherUsersReports = await admin.firestore()
-          .collection(`users/${otherUid}/account_strikes`)
-          .doc(authUid)
-          .get();
+      // Extract report fields with default values to avoid undefined
+      const extremelyStrange: boolean = snapshot.data().extremely_strange ?? false;
+      const harassment: boolean = snapshot.data().harassment ?? false;
+      const quiteRude: boolean = snapshot.data().quite_rude ?? false;
 
-      if (!otherUsersReports.exists) {
-        await admin.firestore()
+      // Log the extracted report details
+      functions.logger.log({
+        message: "Extracted report details",
+        authUid: authUid,
+        otherUid: otherUid,
+        extremelyStrange: extremelyStrange,
+        harassment: harassment,
+        quiteRude: quiteRude,
+        docId: context.params.doc,
+      });
+
+      // Check if the user is reporting themselves
+      if (authUid === otherUid) {
+        functions.logger.warn({
+          message: "User attempted to report themselves",
+          authUid: authUid,
+          otherUid: otherUid,
+          docId: context.params.doc,
+        });
+        throw new functions.https.HttpsError(
+            "unauthenticated",
+            "You cannot report yourself."
+        );
+      }
+
+      // Query and write to Firestore with error handling
+      try {
+        const otherUsersReports = await admin
+            .firestore()
             .collection(`users/${otherUid}/account_strikes`)
             .doc(authUid)
-            .set({
-              harassment: harassment,
-              extremely_strange: extremelyStrange,
-              quite_rude: quiteRude,
-              comments: "",
-            });
+            .get();
+
+        if (!otherUsersReports.exists) {
+          await admin
+              .firestore()
+              .collection(`users/${otherUid}/account_strikes`)
+              .doc(authUid)
+              .set({
+                harassment: harassment,
+                extremely_strange: extremelyStrange,
+                quite_rude: quiteRude,
+                comments: "",
+                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+              });
+
+          // Log success
+          functions.logger.info({
+            message: "Successfully created report",
+            authUid: authUid,
+            otherUid: otherUid,
+            docId: context.params.doc,
+          });
+        } else {
+        // Log if the report already exists
+          functions.logger.info({
+            message: "Report already exists, skipping creation",
+            authUid: authUid,
+            otherUid: otherUid,
+            docId: context.params.doc,
+          });
+        }
+      } catch (error: any) {
+      // Log the error with details
+        functions.logger.error({
+          message: "Error in reportUser function",
+          error: error.message,
+          authUid: authUid,
+          otherUid: otherUid,
+          docId: context.params.doc,
+          stack: error.stack,
+        });
+        throw new functions.https.HttpsError(
+            "internal",
+            "An error occurred while processing the report."
+        );
       }
     });

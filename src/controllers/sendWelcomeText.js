@@ -1,14 +1,31 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const twilio = require("twilio");
-require("dotenv").config();
+
+// Initialize Firebase Admin safely
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
 
 const db = admin.firestore();
 
-// Load Twilio credentials from environment variables
+// Load Twilio credentials from Firebase Config
 const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
+
+// Validate Twilio credentials before creating the client
+if (!accountSid || !authToken || !twilioPhoneNumber) {
+  functions.logger.error({
+    message: "Missing Twilio credentials",
+    accountSid: accountSid ? "defined" : "undefined",
+    authToken: authToken ? "defined" : "undefined",
+    twilioPhoneNumber: twilioPhoneNumber ? "defined" : "undefined",
+    timestamp: new Date().toISOString(),
+  });
+  throw new Error("Twilio credentials are not configured");
+}
+
 const client = twilio(accountSid, authToken);
 
 exports.sendWelcomeText = functions.firestore
@@ -17,31 +34,49 @@ exports.sendWelcomeText = functions.firestore
       const newUser = snap.data();
       const {uid, phone_number, current_city, display_name} = newUser;
 
+      // Validate required fields
+      if (!uid || !phone_number || !display_name || !current_city || !city_map[current_city]) {
+        functions.logger.error({
+          message: "Invalid user data",
+          uid: uid,
+          phone_number: phone_number,
+          current_city: current_city,
+          display_name: display_name,
+          docId: context.params.docId,
+          timestamp: new Date().toISOString(),
+        });
+        await snap.ref.delete();
+        return;
+      }
+
       try {
         const cityConfigRef = db.collection("city_config").doc(current_city);
         const cityConfigDoc = await cityConfigRef.get();
 
         if (!cityConfigDoc.exists) {
-          console.error(`City config not found for ${current_city}`);
+          functions.logger.error({
+            message: "City config not found",
+            current_city: current_city,
+            docId: context.params.docId,
+            timestamp: new Date().toISOString(),
+          });
+          await snap.ref.delete();
           return;
         }
 
-        const cityConfig = cityConfigDoc.data();
-        const totalUsers = cityConfig.totalUsers || 0;
+        // Atomically increment totalUsers and fetch the updated value
+        await cityConfigRef.update({
+          totalUsers: admin.firestore.FieldValue.increment(1),
+        });
+        const updatedCityConfigDoc = await cityConfigRef.get();
+        const totalUsers = updatedCityConfigDoc.data().totalUsers || 0;
 
         let messageBody;
         if (totalUsers >= 500) {
-          const messageBody = `Hey ${display_name}, welcome to Mesh! 
-        
-          ${city_map[current_city]} is alive with ${totalUsers + 1} members. Every Saturday at 10am, we match small groups at local coffee shops to connect and unwind – invites are free, you just pay when you join in. Excited you’re here! – Stuart & Michael, Mesh Co-founders`;
+          messageBody = `Hey ${display_name}, welcome to Mesh! ${city_map[current_city]} has ${totalUsers} members. Join us Saturdays at 10am for coffee meetups – invites are free, you pay when you join. – Stuart & Michael`;
         } else {
-          const messageBody = `Hey ${display_name}, welcome to Mesh! 
-        
-          You’re #${totalUsers + 1} of 500 in ${city_map[current_city]}. We’re brewing something special, and once we hit 500, you’ll get invites to our Saturday coffee meetups. Hang tight – we’ll be in touch! – Stuart & Michael, Mesh Co-founders`;
+          messageBody = `Hey ${display_name}, welcome to Mesh! You’re #${totalUsers}/500 in ${city_map[current_city]}. We’ll invite you to Saturday coffee meetups at 500. Stay tuned! – Stuart & Michael`;
         }
-
-        // Increment totalUsers
-        await cityConfigRef.update({totalUsers: totalUsers + 1});
 
         const formattedPhoneNumber = formatPhoneNumber(phone_number);
         // Send text message
@@ -51,19 +86,47 @@ exports.sendWelcomeText = functions.firestore
           to: formattedPhoneNumber,
         });
 
-        console.log(
-            `Welcome text sent to ${display_name} (${phone_number}) in ${current_city}`
-        );
+        functions.logger.info({
+          message: "Welcome text sent successfully",
+          display_name: display_name,
+          phone_number: phone_number,
+          current_city: current_city,
+          totalUsers: totalUsers,
+          docId: context.params.docId,
+          timestamp: new Date().toISOString(),
+        });
 
         // Delete the document from the tempbin
         await snap.ref.delete();
       } catch (error) {
-        console.error("Error sending welcome text:", error);
+        functions.logger.error({
+          message: "Error sending welcome text",
+          error: error.message,
+          code: error.code,
+          status: error.status,
+          details: error.details,
+          uid: uid,
+          phone_number: phone_number,
+          current_city: current_city,
+          display_name: display_name,
+          docId: context.params.docId,
+          timestamp: new Date().toISOString(),
+        });
+        await snap.ref.delete(); // Clean up on failure
       }
     });
 
 function formatPhoneNumber(phoneNumber) {
-  return phoneNumber.replace(/[^+\d]/g, "");
+  let formatted = phoneNumber.replace(/[^+\d]/g, "");
+  // If the number doesn't start with "+", assume it's a US number and prepend "+1"
+  if (!formatted.startsWith("+")) {
+    formatted = `+1${formatted}`;
+  }
+  // E.164 format: +[country code][number], typically 10-15 digits including country code
+  if (formatted.length < 11 || formatted.length > 15) {
+    throw new Error(`Invalid phone number format: ${phoneNumber} (formatted: ${formatted})`);
+  }
+  return formatted;
 }
 
 const city_map = {
