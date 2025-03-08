@@ -10,50 +10,84 @@ interface FCMTokenData {
   fcm_token: string;
 }
 
+/**
+ * Interface for notification message with optional data.
+ * @interface
+ */
 interface NotificationMessage {
   title: string;
   body: string;
+  data?: { [key: string]: string }; // Optional custom data
 }
 
 /**
  * Send a push notification to a specific user.
- * messageObj must be a valid NotificationMessage object.
  * @async
  * @function
  * @param {string} userId - The user ID.
- * @param {NotificationMessage} messageObj
+ * @param {NotificationMessage} messageObj - The notification message.
  * @return {Promise<void>}
  */
-export async function notifyUser(userId: string,
-    messageObj: NotificationMessage): Promise<void> {
-  const fcmTokensSnapshot = await admin.firestore()
-      .collection("user").doc(userId)
-      .collection("fcm_tokens").get();
+export async function notifyUser(userId: string, messageObj: NotificationMessage): Promise<void> {
+  const db = admin.firestore();
+  const fcmTokensSnapshot = await db
+      .collection("users") // Corrected path
+      .doc(userId)
+      .collection("fcm_tokens")
+      .get();
 
-  for (const doc of fcmTokensSnapshot.docs) {
-    const fcmTokenData: FCMTokenData = doc.data() as FCMTokenData;
+  const tokens = fcmTokensSnapshot.docs
+      .map((doc) => doc.data() as FCMTokenData)
+      .filter((data) => data && data.fcm_token)
+      .map((data) => data.fcm_token);
 
-    if (fcmTokenData && fcmTokenData.fcm_token) {
-      const payload = {
-        notification: {
-          title: messageObj.title,
-          body: messageObj.body,
-        },
-        token: fcmTokenData.fcm_token,
-      };
+  if (tokens.length === 0) {
+    functions.logger.warn("No FCM tokens found for user", {userId});
+    return;
+  }
 
-      try {
-        await admin.messaging().send(payload);
-      } catch (error) {
-        console.error("Error sending notification to token" +
-        `${fcmTokenData.fcm_token}:, (error as Error).message`);
-        // Consider removing the faulty token
-        // from Firestore or take other appropriate actions
-      }
+  const messages = tokens.map((token) => ({
+    notification: {
+      title: messageObj.title,
+      body: messageObj.body,
+    },
+    data: messageObj.data || {},
+    android: {
+      notification: {sound: "default"},
+    },
+    apns: {
+      payload: {aps: {sound: "default"}},
+    },
+    token,
+  }));
+
+  try {
+    const response = await admin.messaging().sendAll(messages);
+    functions.logger.info("FCM Notifications Sent", {
+      userId,
+      successCount: response.successCount,
+      failureCount: response.failureCount,
+    });
+
+    if (response.failureCount > 0) {
+      response.responses.forEach((resp, idx) => {
+        if (!resp.success) {
+          functions.logger.error("Failure sending notification to token", {
+            userId,
+            token: tokens[idx],
+            error: resp.error?.message || "Unknown error",
+          });
+        }
+      });
     }
+  } catch (error) {
+    functions.logger.error("Error sending notifications", {
+      userId,
+      error: (error as Error).message,
+    });
+    throw error; // Re-throw to allow caller to handle
   }
 }
-
 
 /**
  * Cloud Function to send a notification to a specific user.
@@ -69,14 +103,11 @@ export const sendNotification = functions.https.onCall(
         data: { userId: string },
         context: functions.https.CallableContext
     ): Promise<{ success: boolean; message: string }> => {
-    // Retrieve user ID from the function call data
       const userId: string = data.userId;
-      const message = {
+      const message: NotificationMessage = {
         title: "You have been unqueued.",
-        body: "Your liked locations are not open today." +
-          "Please choose other locations.",
+        body: "Your liked locations are not open today. Please choose other locations.",
       };
-
 
       if (userId) {
         await notifyUser(userId, message);
@@ -86,4 +117,3 @@ export const sendNotification = functions.https.onCall(
       }
     }
 );
-
