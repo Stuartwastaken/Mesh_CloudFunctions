@@ -51,7 +51,7 @@ async function processUserChunks(userIds, start, locationId, CHUNK_SIZE) {
       }
 
       const formattedPhoneNumber = formatPhoneNumber(rawPhoneNumber);
-      const textMessage = `Hi ${displayName}, It's time for this week's location reveal! Check out where you're going this Saturday. `;
+      const textMessage = `Hi ${displayName}, it’s time for this week’s location reveal! See where you’re going this Saturday. Invite expires Friday 6pm. Click here to accept or decline`;
       const linkMessage =
         deviceType === "IOS" ?
           "mesh://meshapp.us/invitedConfirm" :

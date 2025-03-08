@@ -10,7 +10,7 @@ const db = admin.firestore();
 const kFcmTokensCollection = "fcm_tokens";
 
 exports.updateAccountsDisabled = functions.pubsub
-    .schedule("every Saturday 21:00") // 3 PM CST / 4 PM CDT
+    .schedule("every Saturday 15:30") // 3:30 PM CST
     .timeZone("America/Chicago")
     .onRun(async (context) => {
       try {
