@@ -72,10 +72,12 @@ exports.sendWelcomeText = functions.firestore
         const totalUsers = updatedCityConfigDoc.data().totalUsers || 0;
 
         let messageBody;
-        if (totalUsers >= 500 || current_city.toLowerCase() === "austin_tx") {
-          messageBody = `Hey ${display_name}, welcome to Mesh! ${city_map[current_city]} has ${totalUsers} members. Join us Saturdays at 10am for coffee meetups – invites are free, you pay when you join. – Stuart & Michael`;
+        if (totalUsers >= 350 || current_city.toLowerCase() === "austin_tx") {
+          messageBody = `Hey ${display_name}, welcome to the Mesh community! ${city_map[current_city]} has ${totalUsers} members. Join us Saturdays at 10am for coffee meetups – invites are free, only pay when you join. – Cheers, the Mesh Team`;
         } else {
-          messageBody = `Hey ${display_name}, welcome to Mesh! You’re #${totalUsers}/500 in ${city_map[current_city]}. We’ll invite you to Saturday coffee meetups at 500. Stay tuned! – Stuart & Michael`;
+          messageBody = `Hey ${display_name}, welcome to the Mesh community! You’re #${totalUsers}/350 in ${city_map[current_city]}. We’ll start invites when ${city_map[current_city]} hits 350.
+          
+          We curate groups of 4 at local coffee shops every Saturday at 10am. We’ll text you when those invites get started. Feel free to explore the app and invite your friends to join! Cheers, the Mesh Team`;
         }
 
         const formattedPhoneNumber = formatPhoneNumber(phone_number);
