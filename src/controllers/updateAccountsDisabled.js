@@ -1,5 +1,6 @@
 const functions = require("firebase-functions");
 const admin = require("firebase-admin");
+const {notifyUser} = require("./sendNotifications");
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -41,15 +42,9 @@ exports.updateAccountsDisabled = functions.pubsub
               shouldBan = true;
             }
 
-            let userTokens = [];
-
             if (shouldBan) {
               batch.update(doc.ref, {account_disabled: true});
               bannedUsers.push({userId, noShowStrikes, timesConnected});
-
-              // Fetch FCM tokens only if user is banned
-              const tokensSnapshot = await doc.ref.collection(kFcmTokensCollection).get();
-              userTokens = tokensSnapshot.docs.map((doc) => doc.data().fcm_token).filter(Boolean);
             }
           }
 
@@ -59,40 +54,31 @@ exports.updateAccountsDisabled = functions.pubsub
           batchCount++;
         } while (lastDoc);
 
-        // Send FCM notifications in parallel
+        // Send FCM notifications using notifyUser
         const notificationPromises = bannedUsers.map(async (user) => {
-          if (user.tokens && user.tokens.length > 0) {
-            const message = {
-              notification: {
-                title: "Account Disabled",
-                body: "Your account has been disabled due to multiple no-shows. Please contact Mesh support for assistance.",
-              },
-              data: {initialPageName: "SupportPage", parameterData: "{\"reason\":\"no_show_strikes\"}"},
-              tokens: user.tokens,
-            };
+          const message = {
+            title: "Account Disabled",
+            body: "Your account has been disabled due to multiple no-shows. Please contact Mesh support for assistance.",
+            data: {
+              initialPageName: "SupportPage",
+              parameterData: "{\"reason\":\"no_show_strikes\"}",
+            },
+          };
 
-            try {
-              return admin.messaging().sendEachForMulticast(message);
-            } catch (error) {
-              functions.logger.error("Error sending FCM notification", {
-                userId: user.userId,
-                error: error.toString(),
-              });
-              return null;
-            }
-          }
-          return null;
-        });
-
-        const fcmResponses = await Promise.all(notificationPromises);
-        fcmResponses.forEach((response) => {
-          if (response) {
-            functions.logger.info("FCM Notification Sent", {
-              successCount: response.successCount,
-              failureCount: response.failureCount,
+          try {
+            await notifyUser(user.userId, message);
+            functions.logger.info("FCM Notification Sent via notifyUser", {
+              userId: user.userId,
+            });
+          } catch (error) {
+            functions.logger.error("Error sending FCM notification via notifyUser", {
+              userId: user.userId,
+              error: error.toString(),
             });
           }
         });
+
+        await Promise.all(notificationPromises);
 
         functions.logger.info("User bans processed", {
           event: "users_banned",
