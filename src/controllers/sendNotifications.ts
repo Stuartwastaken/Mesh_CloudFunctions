@@ -31,7 +31,7 @@ interface NotificationMessage {
 export async function notifyUser(userId: string, messageObj: NotificationMessage): Promise<void> {
   const db = admin.firestore();
   const fcmTokensSnapshot = await db
-      .collection("users") // Corrected path
+      .collection("users")
       .doc(userId)
       .collection("fcm_tokens")
       .get();
@@ -46,46 +46,52 @@ export async function notifyUser(userId: string, messageObj: NotificationMessage
     return;
   }
 
-  const messages = tokens.map((token) => ({
-    notification: {
-      title: messageObj.title,
-      body: messageObj.body,
-    },
-    data: messageObj.data || {},
-    android: {
-      notification: {sound: "default"},
-    },
-    apns: {
-      payload: {aps: {sound: "default"}},
-    },
-    token,
-  }));
+  let successCount = 0;
+  let failureCount = 0;
 
-  try {
-    const response = await admin.messaging().sendAll(messages);
-    functions.logger.info("FCM Notifications Sent", {
-      userId,
-      successCount: response.successCount,
-      failureCount: response.failureCount,
-    });
+  for (const token of tokens) {
+    const message = {
+      notification: {
+        title: messageObj.title,
+        body: messageObj.body,
+      },
+      data: messageObj.data || {},
+      android: {
+        notification: {sound: "default"},
+      },
+      apns: {
+        payload: {aps: {sound: "default"}},
+      },
+      token,
+    };
 
-    if (response.failureCount > 0) {
-      response.responses.forEach((resp, idx) => {
-        if (!resp.success) {
-          functions.logger.error("Failure sending notification to token", {
-            userId,
-            token: tokens[idx],
-            error: resp.error?.message || "Unknown error",
-          });
-        }
+    try {
+      await admin.messaging().send(message);
+      successCount++;
+      functions.logger.info("FCM Notification Sent", {
+        userId,
+        token,
+      });
+    } catch (error) {
+      failureCount++;
+      functions.logger.error("Failure sending notification to token", {
+        userId,
+        token,
+        error: (error as Error).message || "Unknown error",
       });
     }
-  } catch (error) {
-    functions.logger.error("Error sending notifications", {
+  }
+
+  if (failureCount > 0) {
+    functions.logger.warn("Some notifications failed", {
       userId,
-      error: (error as Error).message,
+      successCount,
+      failureCount,
     });
-    throw error; // Re-throw to allow caller to handle
+    // Optionally throw an error if all notifications fail
+    if (successCount === 0) {
+      throw new Error(`Failed to send all notifications for user ${userId}`);
+    }
   }
 }
 

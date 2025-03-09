@@ -10,7 +10,7 @@ const db = admin.firestore();
 const kFcmTokensCollection = "fcm_tokens";
 
 exports.updateAccountsDisabled = functions.pubsub
-    .schedule("every Saturday 15:30") // 3:30 PM CST
+    .schedule("every Saturday 15:30") // 3:30 PM CST / 3:30 PM CDT
     .timeZone("America/Chicago")
     .onRun(async (context) => {
       try {
@@ -21,6 +21,7 @@ exports.updateAccountsDisabled = functions.pubsub
         do {
           let query = db.collection("users")
               .where("noShowStrikes", ">=", 3)
+              .where("account_disabled", "!=", true)
               .orderBy("noShowStrikes")
               .limit(500);
 
