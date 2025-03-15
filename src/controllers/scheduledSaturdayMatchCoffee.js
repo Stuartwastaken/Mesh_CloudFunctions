@@ -2,7 +2,7 @@ const functions = require("firebase-functions");
 const admin = require("firebase-admin");
 const crypto = require("crypto");
 const {Timestamp} = admin.firestore;
-const {notifyUser} = require("./sendNotifications");
+
 
 // Function to get active cities for a given timezone
 async function getActiveCitiesForTimeZone(timeZone) {
@@ -327,13 +327,20 @@ async function getBlockedUsers(uid) {
   const db = admin.firestore();
   const blockedUsersSet = new Set();
 
-  const blockedSnapshot = await db.collection(`users/${uid}/blocked`).get();
-  blockedSnapshot.forEach((doc) => {
-    const blockedData = doc.data();
-    if (blockedData.uid) {
-      blockedUsersSet.add(blockedData.uid.split("/").pop());
-    }
-  });
+  try {
+    const blockedSnapshot = await db.collection(`users/${uid}/blocked`).get();
+    blockedSnapshot.forEach((doc) => {
+      const blockedData = doc.data();
+      // Ensure uid exists and is a string before adding
+      if (blockedData.uid && typeof blockedData.uid === "string") {
+        blockedUsersSet.add(blockedData.uid);
+      } else {
+        console.warn(`Invalid or missing UID in blocked data for user ${uid}:`, blockedData);
+      }
+    });
+  } catch (error) {
+    console.error(`Error fetching blocked users for UID ${uid}:`, error);
+  }
 
   return blockedUsersSet;
 }
@@ -427,22 +434,22 @@ async function saveGroupsToFirestore(groups, city, location) {
 
     await chatRef.set(chatData);
 
-    for (const member of group) {
-      const userDocRef = db.collection("users").doc(member.uid);
-      const doc = await userDocRef.get();
-      if (doc.exists) {
-        await userDocRef.update({
-          group_id: groupDocId,
-          searching: false,
-        });
+    // for (const member of group) {
+    //   const userDocRef = db.collection("users").doc(member.uid);
+    //   const doc = await userDocRef.get();
+    //   if (doc.exists) {
+    //     await userDocRef.update({
+    //       group_id: groupDocId,
+    //       searching: false,
+    //     });
 
-        // Notify the user about their pairing
-        await notifyUser(member.uid, {
-          title: "You've been paired!",
-          body: "Your coffee group is ready. Check your matches to meet your group!",
-        });
-      }
-    }
+    //     // Notify the user about their pairing
+    //     await notifyUser(member.uid, {
+    //       title: "You've been paired!",
+    //       body: "Your coffee group is ready. Check your matches to meet your group!",
+    //     });
+    //   }
+    // }
 
     const queryGroupedDocRef = db.collection("grouped").doc(groupDocId);
     await queryGroupedDocRef.set(groupDoc);
